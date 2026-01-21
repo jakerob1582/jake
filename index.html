@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jacob Robinson - Portfolio</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #000000;
+            color: #ffffff;
+            line-height: 1.6;
+            font-size: 15px;
+            font-weight: 300;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 4rem 2rem;
+        }
+
+        /* Header Section */
+        header {
+            display: flex;
+            gap: 3rem;
+            margin-bottom: 5rem;
+            align-items: flex-start;
+            padding-bottom: 3rem;
+            border-bottom: 1px solid #333;
+        }
+
+        .profile-image {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            object-fit: cover;
+            flex-shrink: 0;
+            border: 2px solid #333;
+        }
+
+        .header-content {
+            flex: 1;
+            padding-top: 1rem;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.02em;
+        }
+
+        .subtitle {
+            font-size: 1.1rem;
+            color: #999;
+            margin-bottom: 1.5rem;
+            font-weight: 400;
+        }
+
+        .contact-info {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            font-size: 0.9rem;
+            color: #999;
+        }
+
+        .contact-info a {
+            color: #999;
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+
+        .contact-info a:hover {
+            color: #ffffff;
+        }
+
+        /* Section Styling */
+        section {
+            margin-bottom: 4rem;
+        }
+
+        h2 {
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            margin-bottom: 2rem;
+            color: #666;
+        }
+
+        /* Education */
+        .education-item {
+            margin-bottom: 1.5rem;
+        }
+
+        .education-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 0.5rem;
+        }
+
+        .institution {
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+
+        .location {
+            color: #999;
+            font-size: 0.9rem;
+        }
+
+        .degree {
+            color: #ccc;
+            margin-bottom: 0.3rem;
+        }
+
+        .education-details {
+            color: #999;
+            font-size: 0.95rem;
+        }
+
+        /* Experience */
+        .experience-item {
+            margin-bottom: 3rem;
+            padding-bottom: 3rem;
+            border-bottom: 1px solid #1a1a1a;
+        }
+
+        .experience-item:last-child {
+            border-bottom: none;
+        }
+
+        .experience-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 0.5rem;
+        }
+
+        .company {
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+
+        .date {
+            color: #999;
+            font-size: 0.9rem;
+        }
+
+        .role {
+            color: #ccc;
+            margin-bottom: 1rem;
+            font-weight: 400;
+        }
+
+        .responsibilities {
+            list-style: none;
+            padding: 0;
+        }
+
+        .responsibilities li {
+            color: #999;
+            margin-bottom: 0.75rem;
+            padding-left: 1.5rem;
+            position: relative;
+            line-height: 1.7;
+        }
+
+        .responsibilities li:before {
+            content: "—";
+            position: absolute;
+            left: 0;
+            color: #444;
+        }
+
+        /* Additional Activities */
+        .activity {
+            margin-bottom: 2rem;
+        }
+
+        .activity-title {
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+
+        .activity-description {
+            color: #999;
+            line-height: 1.7;
+        }
+
+        /* Interests */
+        .interests {
+            color: #999;
+            line-height: 1.7;
+        }
+
+        footer {
+            margin-top: 5rem;
+            padding-top: 2rem;
+            border-top: 1px solid #333;
+            text-align: center;
+            color: #666;
+            font-size: 0.85rem;
+        }
+
+        @media (max-width: 768px) {
+            header {
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+            }
+
+            .profile-image {
+                width: 150px;
+                height: 150px;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+
+            .experience-header,
+            .education-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.25rem;
+            }
+
+            .container {
+                padding: 2rem 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <img src="profile-photo.jpeg" alt="Jacob Robinson" class="profile-image">
+            <div class="header-content">
+                <h1>Jacob Robinson</h1>
+                <div class="subtitle">Aspiring Investor</div>
+                <div class="contact-info">
+                    <span>jakerob@umich.edu</span>
+                    <span>(919) 441-0077</span>
+                    <a href="https://www.linkedin.com/in/jake-robinson-0a4b1217a">LinkedIn</a>
+                    <span>Raleigh, NC</span>
+                </div>
+            </div>
+        </header>
+
+        <section>
+            <h2>Education</h2>
+            <div class="education-item">
+                <div class="education-header">
+                    <span class="institution">University of Michigan</span>
+                    <span class="location">Ann Arbor, MI</span>
+                </div>
+                <div class="degree">Bachelor of Arts with Honors, May 2026</div>
+                <div class="education-details">
+                    College of Literature, Science and the Arts & Ross School of Business<br>
+                    Major: Economics | Minor: Business Administration | GPA: 3.85/4.00
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2>Experience</h2>
+
+            <div class="experience-item">
+                <div class="experience-header">
+                    <span class="company">Broadhaven Capital Partners</span>
+                    <span class="date">Summer 2025</span>
+                </div>
+                <div class="role">Investment Banking and Growth Equity Summer Analyst • New York, NY</div>
+                <ul class="responsibilities">
+                    <li>Built complete valuation toolkit and significant portion of sell-side pitchbook for ~$400mm EV data-tech and credit analytics platform; analyses included DCF, three statement model, trading and precedent transaction comps, LTM/NTM revenue and EBITDA-based regression, WACC build, strategic sale-vs-stake analysis, M&A target screening and sponsor exit case study</li>
+                    <li>Authored CIM sections including product highlights, client profiles, key investments, buyer universe, client case studies and growth/financial highlights while co-building projection model that assigned value and positioning for ~$300mm EV trade surveillance company; facilitated further research/debate on positioning amid restructuring and CARR plateau</li>
+                    <li>Built comprehensive discussion materials for a ~$3.5bn EV asset manager including a detailed 5-year model, DCF, trading and precedent comps analyses, benchmarking growth and margins, evaluating potential acquisition targets and developing an inorganic growth case study for asset managers with the work contributing to a deal that Broadhaven later closed</li>
+                    <li>Researched venture and GP-stake opportunities for firms investment arms, The Cantilever Group and Broadhaven Ventures, supporting diligence on stake and early-stage investments; co-authored the "Alt-Goes-Mainstream" newsletter read by 9,000+ financial professionals</li>
+                </ul>
+            </div>
+
+            <div class="experience-item">
+                <div class="experience-header">
+                    <span class="company">Kimley-Horn and Associates, Inc.</span>
+                    <span class="date">Summer 2024</span>
+                </div>
+                <div class="role">Corporate Finance Summer Analyst • Raleigh, NC</div>
+                <ul class="responsibilities">
+                    <li>Managed Kimley-Horn's stale dated checks database of over eight million dollars and improved processes regarding re-issuing, closing and remitting to unclaimed property; saved the firm over four million dollars in stale dated checks outstanding and remittance fees</li>
+                    <li>Conducted a full valuation of Kimley-Horn using discounted cash flow, leveraged buyout and sum of the parts analysis leading to a company value of $7.4bn approved by treasurer and CFO</li>
+                </ul>
+            </div>
+
+            <div class="experience-item">
+                <div class="experience-header">
+                    <span class="company">Maize and Blue Endowment Fund</span>
+                    <span class="date">2024 - Present</span>
+                </div>
+                <div class="role">Leadership Team • Ann Arbor, MI</div>
+                <ul class="responsibilities">
+                    <li>Manage ~$750,000 segment of University of Michigan's endowment, conducting in-depth financial analyses and valuations to identify undervalued U.S. equities resulting in informed investment decisions; fund generated alpha of 600bps benchmarked to the $SPMD in 2024</li>
+                    <li>Pitched $SKYH with $16 price target on thesis that the market undervalues private jet positioning and underestimates post-RapidBuilt merger CapEx savings; led pitchbook creation, developed DCF and operating model, built revenue forecast and applied EV/Sales comps to validate investment; asked question to management on Sky Harbour Q4 2024 earnings call</li>
+                    <li>Pitched $OSCR with a $30 price target thesis being misaligned corporate accounting, penetration of the sunbelt ACA market and ICHRA insurance growth; oversaw team of three to design pitchbook, performed DCF analysis and applied trading comps to validate investment</li>
+                </ul>
+            </div>
+
+            <div class="experience-item">
+                <div class="experience-header">
+                    <span class="company">DIAG Growth Private Equity Fund</span>
+                    <span class="date">2025 - Present</span>
+                </div>
+                <div class="role">Investment Analyst • Ann Arbor, MI</div>
+                <ul class="responsibilities">
+                    <li>Conducted four-week underwriting of a co-investment in ~1bn EV managed cloud, infrastructure and consulting provider alongside TowerBrook Capital Partners: built base and downside LBO cases, evaluated merits and risks, developed revenue and operating model and authored a 40-page investment memorandum supporting IC approval and investment</li>
+                    <li>Conducted four-week underwriting of a ~3bn EV events and experiences platform alongside RedBird Capital Partners, building base and downside LBO cases with M&A sensitivity toggles, assessed key merits and risks, developed revenue and operating model projections and drafted a 40 page investment memorandum that supported IC approval and investment</li>
+                </ul>
+            </div>
+        </section>
+
+        <section>
+            <h2>Leadership & Activities</h2>
+            
+            <div class="activity">
+                <div class="activity-title">Viceroy for Barstool UofM</div>
+                <div class="activity-description">Lead a team of three responsible for managing social media accounts with 240,000+ followers; accounts have seen 55% growth since joining (August 2023)</div>
+            </div>
+
+            <div class="activity">
+                <div class="activity-title">Vice President, Theta Capital</div>
+                <div class="activity-description">Cover technology and financial companies, pitch equity ideas using fundamental analysis to club and mentor members on valuation and recruiting</div>
+            </div>
+        </section>
+
+        <section>
+            <h2>Interests</h2>
+            <div class="interests">
+                College football, stand-up comedy, watches, poker, barbequing and Italian cuisine
+            </div>
+        </section>
+
+        <footer>
+            © 2026 Jacob Robinson
+        </footer>
+    </div>
+</body>
+</html>
