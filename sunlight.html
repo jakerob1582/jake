@@ -2,1101 +2,998 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NYC Patio Sun · Windsor Court Edition</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>SunSpot · NYC Rooftop Sun, Ranked</title>
+    <meta name="theme-color" content="#ffffff">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
     <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
     <script src="https://unpkg.com/suncalc@1.9.0/suncalc.js"></script>
     <style>
         :root {
-            --bg-0: #07070d;
-            --bg-1: #0e0e1a;
-            --bg-2: #181828;
-            --line: rgba(255,255,255,0.08);
-            --text: #f5f0e6;
-            --text-dim: #8a8aa0;
-            --sun: #ffb347;
-            --sun-bright: #ffd066;
-            --sun-deep: #ff6a2a;
-            --twilight: #6a4a8a;
-            --night: #2a3458;
+            --bg: #ffffff;
+            --surface: #f7f6f3;
+            --surface-2: #efede8;
+            --line: #e7e4dd;
+            --text: #1a1d21;
+            --text-2: #5c6370;
+            --text-3: #9aa1ab;
+            --brand: #ff8a00;
+            --brand-deep: #e07000;
+            --brand-soft: #fff3e2;
+            --gold: #ffb703;
+            --green: #128a52;
+            --green-lt: #7cb342;
+            --amber: #f5a623;
+            --shade: #aeb6bf;
+            --navy: #14233c;
+            --radius: 16px;
+            --shadow-sm: 0 1px 2px rgba(20, 25, 35, 0.06), 0 2px 8px rgba(20, 25, 35, 0.05);
+            --shadow-md: 0 4px 14px rgba(20, 25, 35, 0.10), 0 1px 3px rgba(20, 25, 35, 0.07);
+            --shadow-lg: 0 12px 32px rgba(20, 25, 35, 0.16);
+            --sab: env(safe-area-inset-bottom, 0px);
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
-
         html, body {
             height: 100%;
             overflow: hidden;
-            background: var(--bg-0);
+            background: var(--bg);
             color: var(--text);
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            font-weight: 300;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+            font-size: 15px;
             -webkit-font-smoothing: antialiased;
         }
+        button { font-family: inherit; }
+        input { font-family: inherit; }
 
-        #map {
-            position: absolute;
-            inset: 0;
-            background: var(--bg-0);
+        /* ===== App shell ===== */
+        .app {
+            display: grid;
+            grid-template-rows: 64px 1fr;
+            grid-template-columns: 420px 1fr;
+            grid-template-areas:
+                "header header"
+                "panel  map";
+            height: 100%;
         }
 
-        /* Top bar */
-        .top-bar {
-            position: absolute;
-            top: 0; left: 0; right: 0;
-            padding: 18px 22px;
+        /* ===== Header ===== */
+        .topbar {
+            grid-area: header;
             display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            z-index: 10;
-            pointer-events: none;
-            background: linear-gradient(180deg, rgba(7,7,13,0.85) 0%, rgba(7,7,13,0) 100%);
+            align-items: center;
+            gap: 18px;
+            padding: 0 20px;
+            background: var(--bg);
+            border-bottom: 1px solid var(--line);
+            z-index: 30;
         }
-        .top-bar > * { pointer-events: auto; }
-
-        .brand {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
-        .brand .title {
-            font-family: 'Inter', sans-serif;
-            font-weight: 600;
-            font-size: 18px;
-            letter-spacing: -0.01em;
+        .logo {
             display: flex;
             align-items: center;
             gap: 10px;
-        }
-        .brand .sun-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: radial-gradient(circle at 30% 30%, var(--sun-bright), var(--sun-deep));
-            box-shadow: 0 0 12px var(--sun), 0 0 22px rgba(255, 138, 61, 0.4);
-            animation: pulse 3.5s ease-in-out infinite;
-        }
-        @keyframes pulse {
-            0%, 100% { box-shadow: 0 0 12px var(--sun), 0 0 22px rgba(255, 138, 61, 0.4); }
-            50% { box-shadow: 0 0 18px var(--sun), 0 0 30px rgba(255, 138, 61, 0.7); }
-        }
-        .brand .sub {
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.18em;
-            color: var(--text-dim);
-            font-weight: 500;
-        }
-
-        .top-info {
-            display: flex;
-            gap: 14px;
-            align-items: center;
-        }
-        .pill {
-            background: rgba(20, 20, 32, 0.72);
-            backdrop-filter: blur(14px);
-            -webkit-backdrop-filter: blur(14px);
-            border: 1px solid var(--line);
-            border-radius: 999px;
-            padding: 8px 14px;
-            font-size: 12px;
-            font-family: 'JetBrains Mono', monospace;
-            font-weight: 400;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            color: var(--text-dim);
-        }
-        .pill .label { color: var(--text-dim); }
-        .pill .value { color: var(--text); font-weight: 600; }
-        .pill .swatch {
-            width: 8px; height: 8px; border-radius: 50%;
-            background: var(--sun);
-            box-shadow: 0 0 8px currentColor;
-        }
-
-        /* Sidebar */
-        .sidebar {
-            position: absolute;
-            top: 78px;
-            left: 22px;
-            bottom: 130px;
-            width: 340px;
-            background: rgba(14, 14, 26, 0.78);
-            backdrop-filter: blur(18px);
-            -webkit-backdrop-filter: blur(18px);
-            border: 1px solid var(--line);
-            border-radius: 18px;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            z-index: 9;
-            box-shadow: 0 14px 40px rgba(0,0,0,0.5);
-        }
-
-        .sidebar-header {
-            padding: 16px 18px 12px;
-            border-bottom: 1px solid var(--line);
-        }
-        .sidebar-header .h {
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.18em;
-            color: var(--text-dim);
-            font-weight: 600;
-        }
-        .sidebar-header .sub {
-            font-size: 13px;
-            color: var(--text);
-            margin-top: 4px;
-            font-weight: 400;
-        }
-
-        .filter-row {
-            display: flex;
-            gap: 6px;
-            padding: 10px 14px;
-            border-bottom: 1px solid var(--line);
-        }
-        .chip {
-            font-size: 10.5px;
-            text-transform: uppercase;
-            letter-spacing: 0.12em;
-            font-weight: 600;
-            padding: 6px 10px;
-            border-radius: 999px;
-            background: rgba(255,255,255,0.04);
-            color: var(--text-dim);
-            border: 1px solid transparent;
-            cursor: pointer;
-            transition: all 0.18s ease;
+            flex-shrink: 0;
             user-select: none;
         }
-        .chip:hover { color: var(--text); background: rgba(255,255,255,0.07); }
-        .chip.active {
-            background: rgba(255, 179, 71, 0.14);
-            color: var(--sun-bright);
-            border-color: rgba(255, 179, 71, 0.35);
+        .logo-mark {
+            width: 34px; height: 34px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, var(--gold), var(--brand));
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; font-size: 17px;
+            box-shadow: 0 2px 8px rgba(255, 138, 0, 0.35);
+        }
+        .logo-name {
+            font-weight: 800;
+            font-size: 19px;
+            letter-spacing: -0.03em;
+        }
+        .logo-name span { color: var(--brand); }
+        .logo-tag {
+            font-size: 11px;
+            color: var(--text-3);
+            font-weight: 500;
+            margin-top: 1px;
+            white-space: nowrap;
         }
 
-        .patio-list {
+        .search-wrap {
             flex: 1;
-            overflow-y: auto;
-            scrollbar-width: thin;
-            scrollbar-color: rgba(255,255,255,0.1) transparent;
-        }
-        .patio-list::-webkit-scrollbar { width: 6px; }
-        .patio-list::-webkit-scrollbar-thumb {
-            background: rgba(255,255,255,0.1);
-            border-radius: 3px;
-        }
-
-        .patio {
-            padding: 12px 16px;
-            border-bottom: 1px solid rgba(255,255,255,0.04);
-            cursor: pointer;
-            transition: background 0.15s ease;
-            display: flex;
-            gap: 12px;
-            align-items: flex-start;
-        }
-        .patio:hover { background: rgba(255,255,255,0.03); }
-        .patio.active { background: rgba(255, 179, 71, 0.08); }
-
-        .score-ring {
+            max-width: 420px;
             position: relative;
-            width: 38px;
-            height: 38px;
-            flex-shrink: 0;
         }
-        .score-ring svg { transform: rotate(-90deg); }
-        .score-ring .track { stroke: rgba(255,255,255,0.08); }
-        .score-ring .fill { stroke: var(--sun); transition: stroke-dashoffset 0.4s ease, stroke 0.4s ease; }
-        .score-ring .num {
-            position: absolute;
-            inset: 0;
+        .search-wrap .icon {
+            position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
+            color: var(--text-3); font-size: 14px; pointer-events: none;
+        }
+        .search {
+            width: 100%;
+            border: 1.5px solid var(--line);
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 10px 14px 10px 36px;
+            font-size: 14px;
+            color: var(--text);
+            outline: none;
+            transition: border-color 0.15s ease, background 0.15s ease;
+        }
+        .search:focus { border-color: var(--brand); background: #fff; }
+        .search::placeholder { color: var(--text-3); }
+
+        .top-stats {
+            margin-left: auto;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .stat-chip {
             display: flex;
             align-items: center;
-            justify-content: center;
-            font-family: 'JetBrains Mono', monospace;
+            gap: 7px;
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: 7px 13px;
+            font-size: 12.5px;
             font-weight: 600;
-            font-size: 11px;
-            color: var(--text);
+            color: var(--text-2);
+            white-space: nowrap;
+        }
+        .stat-chip .v { color: var(--text); font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 12px; }
+        .stat-chip.phase { background: var(--brand-soft); border-color: #ffd9a8; color: var(--brand-deep); }
+
+        /* ===== Panel (ranked list) ===== */
+        .panel {
+            grid-area: panel;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg);
+            border-right: 1px solid var(--line);
+            overflow: hidden;
+            z-index: 20;
         }
 
-        .patio-info { flex: 1; min-width: 0; }
-        .patio-name {
-            font-size: 13.5px;
-            font-weight: 500;
+        .hero {
+            margin: 14px 16px 0;
+            border-radius: var(--radius);
+            background: linear-gradient(120deg, #ffb703 0%, #ff8a00 60%, #ff6d1f 100%);
+            color: #fff;
+            padding: 16px 18px;
+            cursor: pointer;
+            box-shadow: 0 6px 20px rgba(255, 138, 0, 0.3);
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .hero:hover { transform: translateY(-1px); box-shadow: 0 10px 26px rgba(255, 138, 0, 0.38); }
+        .hero::after {
+            content: '☀';
+            position: absolute;
+            right: -8px; top: -18px;
+            font-size: 92px;
+            opacity: 0.18;
+        }
+        .hero .k {
+            font-size: 10.5px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.14em;
+            opacity: 0.85;
+        }
+        .hero .pick {
+            font-size: 19px;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            margin: 3px 0 2px;
+        }
+        .hero .sub {
+            font-size: 12.5px;
+            font-weight: 600;
+            opacity: 0.92;
+        }
+
+        .panel-controls {
+            padding: 14px 16px 10px;
+        }
+        .chips {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .chip {
+            border: 1.5px solid var(--line);
+            background: #fff;
+            color: var(--text-2);
+            font-size: 12.5px;
+            font-weight: 600;
+            padding: 7px 13px;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            user-select: none;
+        }
+        .chip:hover { border-color: #d9d4c9; color: var(--text); }
+        .chip.active {
+            background: var(--navy);
+            border-color: var(--navy);
+            color: #fff;
+        }
+        .list-meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 2px 0;
+        }
+        .list-meta .count {
+            font-size: 12px;
+            color: var(--text-3);
+            font-weight: 600;
+        }
+        .sort {
+            display: flex;
+            gap: 2px;
+            background: var(--surface);
+            border-radius: 9px;
+            padding: 3px;
+        }
+        .sort button {
+            border: none;
+            background: transparent;
+            font-size: 11.5px;
+            font-weight: 700;
+            color: var(--text-3);
+            padding: 5px 11px;
+            border-radius: 7px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .sort button.active {
+            background: #fff;
             color: var(--text);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 4px 10px 90px;
+            scrollbar-width: thin;
+            scrollbar-color: #d9d4c9 transparent;
+            -webkit-overflow-scrolling: touch;
+        }
+        .list::-webkit-scrollbar { width: 5px; }
+        .list::-webkit-scrollbar-thumb { background: #ddd8cd; border-radius: 3px; }
+
+        .card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 13px 10px 13px 6px;
+            border-radius: 14px;
+            cursor: pointer;
+            transition: background 0.13s ease;
+            border-bottom: 1px solid #f1efe9;
+        }
+        .card:hover { background: var(--surface); }
+        .card.active { background: var(--brand-soft); }
+
+        .rank {
+            width: 26px;
+            text-align: center;
+            font-weight: 800;
+            font-size: 14px;
+            color: var(--text-3);
+            flex-shrink: 0;
+            font-variant-numeric: tabular-nums;
+        }
+        .card.top3 .rank { color: var(--brand); }
+
+        .card-body { flex: 1; min-width: 0; }
+        .card-name {
+            font-size: 14.5px;
+            font-weight: 700;
+            letter-spacing: -0.01em;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
-        .patio-meta {
-            font-size: 11px;
-            color: var(--text-dim);
+        .card-meta {
+            font-size: 12px;
+            color: var(--text-2);
             margin-top: 2px;
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
-        .patio-meta .tag {
-            font-size: 9.5px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            padding: 2px 6px;
-            border-radius: 4px;
-            background: rgba(255,255,255,0.06);
-            color: var(--text-dim);
-        }
-        .patio-meta .tag.rooftop { background: rgba(255, 179, 71, 0.12); color: var(--sun-bright); }
-        .patio-meta .tag.garden { background: rgba(120, 200, 120, 0.12); color: #88dd88; }
-        .patio-meta .tag.patio { background: rgba(150, 170, 230, 0.12); color: #99b0e8; }
-        .patio-meta .tag.water { background: rgba(80, 180, 220, 0.14); color: #6cd2f0; }
-        .patio-vibe {
+        .card-meta b { color: var(--text-2); font-weight: 600; }
+        .card-sun {
             font-size: 11.5px;
-            color: var(--text-dim);
-            margin-top: 4px;
-            font-style: italic;
-            line-height: 1.4;
+            margin-top: 3px;
+            font-weight: 600;
+            color: var(--brand-deep);
         }
-        .walk-time {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 10px;
-            color: var(--text-dim);
-            margin-top: 4px;
-        }
+        .card-sun.shaded { color: var(--text-3); }
+        .card-sun.closed { color: var(--text-3); font-style: italic; }
 
-        /* Bottom controls (slider) */
-        .controls {
-            position: absolute;
-            bottom: 0; left: 0; right: 0;
-            padding: 18px 22px 22px;
-            z-index: 10;
-            background: linear-gradient(0deg, rgba(7,7,13,0.92) 0%, rgba(7,7,13,0) 100%);
-            display: flex;
-            justify-content: center;
-            pointer-events: none;
-        }
-        .controls > * { pointer-events: auto; }
-
-        .console {
-            background: rgba(10, 10, 20, 0.85);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid var(--line);
-            border-radius: 18px;
-            padding: 14px 18px;
+        .bubble {
+            width: 42px; height: 42px;
+            border-radius: 50%;
             display: flex;
             align-items: center;
-            gap: 18px;
-            min-width: 720px;
-            max-width: 980px;
-            width: calc(100% - 380px);
-            box-shadow: 0 14px 40px rgba(0,0,0,0.6);
+            justify-content: center;
+            color: #fff;
+            font-weight: 800;
+            font-size: 14px;
+            flex-shrink: 0;
+            font-variant-numeric: tabular-nums;
+            box-shadow: var(--shadow-sm);
         }
 
-        .date-control {
+        .type-pill {
+            display: inline-block;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            padding: 2px 7px;
+            border-radius: 5px;
+            vertical-align: 1px;
+            margin-right: 5px;
+        }
+        .type-pill.rooftop { background: #fff0dd; color: #c46a00; }
+        .type-pill.patio   { background: #e8eefb; color: #3b66c4; }
+        .type-pill.garden  { background: #e5f4e3; color: #2e7d32; }
+        .type-pill.water   { background: #e0f3f9; color: #0277a8; }
+
+        .empty {
+            text-align: center;
+            color: var(--text-3);
+            font-size: 13px;
+            padding: 40px 20px;
+            font-weight: 500;
+        }
+
+        /* ===== Map ===== */
+        .map-area { grid-area: map; position: relative; overflow: hidden; }
+        #map { position: absolute; inset: 0; background: #eae6df; }
+        #map-tint {
+            position: absolute; inset: 0;
+            pointer-events: none;
+            z-index: 1;
+            transition: background 0.5s ease;
+            background: transparent;
+        }
+
+        .map-buttons {
+            position: absolute;
+            top: 16px; right: 16px;
             display: flex;
             flex-direction: column;
-            gap: 2px;
-            min-width: 110px;
+            gap: 8px;
+            z-index: 5;
         }
-        .date-control label {
-            font-size: 9.5px;
-            text-transform: uppercase;
-            letter-spacing: 0.16em;
-            color: var(--text-dim);
+        .map-btn {
+            width: 42px; height: 42px;
+            border-radius: 12px;
+            border: 1px solid var(--line);
+            background: #fff;
+            color: var(--text);
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: var(--shadow-md);
+            transition: all 0.15s ease;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .map-btn:hover { transform: translateY(-1px); box-shadow: var(--shadow-lg); }
+        .map-btn.on { background: var(--brand-soft); border-color: #ffd9a8; color: var(--brand-deep); }
+
+        .legend {
+            position: absolute;
+            right: 16px;
+            bottom: 118px;
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            padding: 12px 14px;
+            z-index: 5;
+            box-shadow: var(--shadow-md);
+            font-size: 11.5px;
+            color: var(--text-2);
             font-weight: 600;
         }
-        .date-control input[type="date"] {
-            background: transparent;
-            border: none;
-            color: var(--text);
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 13px;
-            font-weight: 500;
-            padding: 0;
-            color-scheme: dark;
-            cursor: pointer;
+        .legend .h {
+            font-size: 10px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: var(--text-3);
+            margin-bottom: 8px;
         }
-        .date-control input[type="date"]:focus { outline: none; }
+        .legend-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+        .legend-row:last-child { margin-bottom: 0; }
+        .legend-b {
+            width: 20px; height: 20px;
+            border-radius: 50%;
+            color: #fff;
+            font-size: 8.5px;
+            font-weight: 800;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
 
-        .slider-wrap {
-            flex: 1;
+        /* ===== Time console ===== */
+        .console {
+            position: absolute;
+            left: 50%;
+            bottom: 18px;
+            transform: translateX(-50%);
+            width: min(720px, calc(100% - 32px));
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            box-shadow: var(--shadow-lg);
+            padding: 13px 18px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            z-index: 6;
+        }
+        .date-ctl {
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: 1px;
+            flex-shrink: 0;
         }
-        .slider-labels {
+        .date-ctl label {
+            font-size: 9.5px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: var(--text-3);
+        }
+        .date-ctl input {
+            border: none;
+            background: transparent;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text);
+            color-scheme: light;
+            cursor: pointer;
+            outline: none;
+            padding: 0;
+        }
+
+        .slider-wrap { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+        .slider-top {
             display: flex;
             justify-content: space-between;
             align-items: baseline;
             font-size: 10px;
-            color: var(--text-dim);
-            text-transform: uppercase;
-            letter-spacing: 0.15em;
-            font-weight: 600;
+            font-weight: 700;
+            color: var(--text-3);
             font-family: 'JetBrains Mono', monospace;
         }
-        .slider-labels .center {
-            color: var(--sun-bright);
-            font-size: 11px;
-        }
-        .slider-labels .center .clock {
-            font-size: 22px;
+        .slider-top .mid {
             color: var(--text);
+            font-size: 17px;
             font-weight: 700;
-            letter-spacing: 0.02em;
-            margin-left: 8px;
+            letter-spacing: -0.01em;
         }
-        .slider-track {
-            position: relative;
-            height: 18px;
-            display: flex;
-            align-items: center;
-        }
-        .slider-bg {
+        .slider-track { position: relative; height: 22px; display: flex; align-items: center; }
+        .track-bg {
             position: absolute;
-            inset: 7px 0 7px 0;
+            left: 0; right: 0;
+            height: 8px;
+            top: 7px;
             border-radius: 999px;
             background: linear-gradient(90deg,
-                #1a1c30 0%,
-                #2c2540 12%,
-                #6a4a8a 22%,
-                #ff7a3a 30%,
-                #ffd066 50%,
-                #ff7a3a 70%,
-                #6a4a8a 78%,
-                #2c2540 88%,
-                #1a1c30 100%);
-            opacity: 0.55;
+                #dfe3ec 0%, #e8e0ee 16%,
+                #ffd9a0 26%, #ffc24d 38%,
+                #ffd76e 50%, #ffc24d 62%,
+                #ff9e54 74%, #d9b8e0 84%,
+                #dfe3ec 100%);
         }
-        .slider-now {
+        .tick {
             position: absolute;
-            top: 0; bottom: 0;
-            width: 2px;
-            background: var(--sun-bright);
-            box-shadow: 0 0 10px var(--sun), 0 0 18px var(--sun-deep);
+            top: 4px;
+            width: 2px; height: 14px;
+            background: rgba(20, 29, 50, 0.32);
+            border-radius: 1px;
             transform: translateX(-1px);
             pointer-events: none;
-            border-radius: 1px;
         }
-        .slider-marker {
-            position: absolute;
-            top: 50%;
-            transform: translate(-50%, -50%);
-            width: 1px;
-            height: 12px;
-            background: rgba(255,255,255,0.5);
-            pointer-events: none;
-        }
-        .slider-marker.golden { background: var(--sun-bright); height: 14px; }
+        .tick.golden { background: var(--brand); }
         input[type="range"].slider {
             -webkit-appearance: none;
             appearance: none;
-            background: transparent;
             width: 100%;
+            background: transparent;
+            height: 22px;
             margin: 0;
             position: relative;
             z-index: 2;
-            height: 18px;
             cursor: grab;
         }
         input[type="range"].slider:active { cursor: grabbing; }
         input[type="range"].slider::-webkit-slider-thumb {
             -webkit-appearance: none;
-            width: 16px; height: 16px;
+            width: 22px; height: 22px;
             border-radius: 50%;
-            background: var(--text);
-            border: 2px solid var(--sun);
-            box-shadow: 0 0 10px var(--sun), 0 0 18px rgba(255, 138, 61, 0.5);
-            cursor: grab;
+            background: #fff;
+            border: 3px solid var(--brand);
+            box-shadow: 0 2px 8px rgba(255, 138, 0, 0.4);
         }
         input[type="range"].slider::-moz-range-thumb {
-            width: 16px; height: 16px;
+            width: 20px; height: 20px;
             border-radius: 50%;
-            background: var(--text);
-            border: 2px solid var(--sun);
-            box-shadow: 0 0 10px var(--sun);
+            background: #fff;
+            border: 3px solid var(--brand);
+            box-shadow: 0 2px 8px rgba(255, 138, 0, 0.4);
         }
 
-        .actions {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
+        .console-actions { display: flex; gap: 7px; flex-shrink: 0; }
         .btn {
-            background: rgba(255,255,255,0.05);
-            border: 1px solid var(--line);
+            border: 1.5px solid var(--line);
+            background: #fff;
             color: var(--text);
-            padding: 8px 14px;
-            border-radius: 999px;
-            font-size: 10.5px;
-            text-transform: uppercase;
-            letter-spacing: 0.14em;
-            font-weight: 600;
+            font-size: 12px;
+            font-weight: 700;
+            padding: 9px 14px;
+            border-radius: 11px;
             cursor: pointer;
-            transition: all 0.18s ease;
-            font-family: inherit;
-            display: flex;
-            align-items: center;
-            gap: 6px;
+            transition: all 0.15s ease;
+            white-space: nowrap;
         }
-        .btn:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.18); }
+        .btn:hover { border-color: #d4cfc4; background: var(--surface); }
         .btn.primary {
-            background: linear-gradient(135deg, #ff8a3d, #ffb347);
-            color: #20140a;
-            border-color: transparent;
+            background: var(--brand);
+            border-color: var(--brand);
+            color: #fff;
+            box-shadow: 0 2px 10px rgba(255, 138, 0, 0.35);
         }
-        .btn.primary:hover {
-            background: linear-gradient(135deg, #ffa05c, #ffc777);
-            box-shadow: 0 0 14px rgba(255, 138, 61, 0.55);
-        }
-        .btn.icon {
-            padding: 8px 10px;
-        }
+        .btn.primary:hover { background: var(--brand-deep); border-color: var(--brand-deep); }
+        .btn.icon { padding: 9px 12px; }
 
-        /* Map UI buttons (top right) */
-        .map-ui {
-            position: absolute;
-            top: 78px;
-            right: 22px;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            z-index: 9;
-        }
-        .map-ui .btn {
-            background: rgba(14, 14, 26, 0.78);
-            backdrop-filter: blur(14px);
-            -webkit-backdrop-filter: blur(14px);
-            justify-content: center;
-            min-width: 42px;
-        }
-
-        /* Legend */
-        .legend {
-            position: absolute;
-            right: 22px;
-            bottom: 130px;
-            background: rgba(14, 14, 26, 0.78);
-            backdrop-filter: blur(14px);
-            -webkit-backdrop-filter: blur(14px);
-            border: 1px solid var(--line);
-            border-radius: 12px;
-            padding: 12px 14px;
-            font-size: 10.5px;
-            color: var(--text-dim);
-            min-width: 160px;
-            z-index: 9;
-        }
-        .legend .h {
-            font-size: 9.5px;
-            text-transform: uppercase;
-            letter-spacing: 0.16em;
-            color: var(--text-dim);
-            font-weight: 600;
-            margin-bottom: 8px;
-        }
-        .legend-row {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 5px;
-        }
-        .legend-dot {
-            width: 12px; height: 12px;
-            border-radius: 50%;
-            flex-shrink: 0;
-        }
-        .legend-dot.high {
-            background: radial-gradient(circle at 30% 30%, #ffe9a8, #ffd066);
-            box-shadow: 0 0 14px #ffd066, 0 0 26px rgba(255,170,68,0.55);
-        }
-        .legend-dot.mid {
-            background: radial-gradient(circle at 30% 30%, #ffc28a, #ff9148);
-            box-shadow: 0 0 10px #ff9148, 0 0 18px rgba(255,138,61,0.45);
-        }
-        .legend-dot.low {
-            background: radial-gradient(circle at 30% 30%, #9a7898, #7a5878);
-            box-shadow: 0 0 4px rgba(122,88,120,0.45);
-        }
-        .legend-dot.none { background: #2c2c40; border: 1px solid #3a3a4e; }
-
-        .legend-row.home .legend-dot {
-            background: #ffffff;
-            box-shadow: 0 0 10px rgba(255,255,255,0.6);
-            position: relative;
-        }
-
-        /* Custom MapLibre marker — fixed wrapper keeps the lat/lng anchor stable;
-           an inner dot scales/colors based on sun score so the position never drifts. */
-        .sun-marker {
-            width: 32px;
-            height: 32px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            position: relative;
-        }
-        .sun-dot {
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            transition: transform 0.25s ease, background 0.3s ease, box-shadow 0.3s ease, opacity 0.25s ease;
-        }
-        .sun-marker:hover .sun-dot { transform: scale(1.5); z-index: 5; }
-        .sun-marker.home .sun-dot {
-            width: 14px; height: 14px;
-            background: #ffffff;
-            border: 3px solid #20140a;
-            box-shadow: 0 0 0 2px #ffffff, 0 0 16px rgba(255,255,255,0.7);
-        }
-        .sun-marker.home::before {
-            content: '';
-            position: absolute;
-            width: 36px; height: 36px;
-            border-radius: 50%;
-            border: 1px dashed rgba(255,255,255,0.4);
-            animation: spin 18s linear infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        /* MapLibre popup styling */
+        /* ===== Popup ===== */
         .maplibregl-popup-content {
-            background: rgba(10, 10, 20, 0.96) !important;
-            backdrop-filter: blur(18px);
+            background: #fff !important;
             color: var(--text);
-            border-radius: 14px !important;
+            border-radius: 16px !important;
             border: 1px solid var(--line);
-            padding: 14px 16px !important;
+            box-shadow: var(--shadow-lg) !important;
+            padding: 16px 17px !important;
             font-family: inherit;
-            min-width: 240px;
-            box-shadow: 0 14px 40px rgba(0,0,0,0.7);
+            min-width: 250px;
+            max-width: 300px;
         }
         .maplibregl-popup-tip { display: none !important; }
         .maplibregl-popup-close-button {
-            color: var(--text-dim) !important;
-            font-size: 18px !important;
-            padding: 4px 8px !important;
+            color: var(--text-3) !important;
+            font-size: 19px !important;
+            padding: 5px 9px !important;
+            right: 2px !important; top: 2px !important;
         }
-        .popup-name {
-            font-size: 15px;
-            font-weight: 600;
-            margin-bottom: 4px;
+        .pp-head { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
+        .pp-name { font-size: 16px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.25; flex: 1; padding-right: 12px; }
+        .pp-addr { font-size: 11.5px; color: var(--text-3); font-weight: 600; margin-bottom: 9px; }
+        .pp-row { font-size: 12.5px; color: var(--text-2); font-weight: 600; margin-bottom: 4px; display: flex; gap: 7px; align-items: center; }
+        .pp-row .dot { color: var(--brand); }
+        .pp-vibe {
+            font-size: 12.5px; color: var(--text-2);
+            font-style: italic; line-height: 1.45;
+            border-top: 1px solid var(--line);
+            margin-top: 9px; padding-top: 9px;
         }
-        .popup-addr {
-            font-size: 11px;
-            color: var(--text-dim);
-            margin-bottom: 10px;
-            font-family: 'JetBrains Mono', monospace;
-        }
-        .popup-stats {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-            margin-bottom: 10px;
-        }
-        .popup-stat {
-            background: rgba(255,255,255,0.03);
-            border-radius: 8px;
-            padding: 8px 10px;
-        }
-        .popup-stat .l {
-            font-size: 9px;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: var(--text-dim);
-            font-weight: 600;
-        }
-        .popup-stat .v {
-            font-size: 14px;
-            color: var(--text);
-            font-weight: 600;
-            margin-top: 2px;
-            font-family: 'JetBrains Mono', monospace;
-        }
-        .popup-stat .v.sun { color: var(--sun-bright); }
-        .popup-vibe {
+        .pp-actions { display: flex; gap: 7px; margin-top: 11px; }
+        .pp-btn {
+            flex: 1;
+            text-align: center;
+            text-decoration: none;
             font-size: 12px;
-            color: #ccc;
-            line-height: 1.45;
-            font-style: italic;
+            font-weight: 700;
+            padding: 9px 0;
+            border-radius: 10px;
+            background: var(--brand);
+            color: #fff !important;
+            transition: background 0.15s ease;
         }
-        .popup-tags {
-            display: flex;
+        .pp-btn:hover { background: var(--brand-deep); }
+        .pp-btn.alt { background: var(--surface); color: var(--text) !important; border: 1px solid var(--line); }
+        .pp-btn.alt:hover { background: var(--surface-2); }
+
+        /* ===== Map pins ===== */
+        .pin {
+            width: 36px; height: 36px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+        }
+        .pin-bubble {
+            width: 30px; height: 30px;
+            border-radius: 50%;
+            border: 2.5px solid #fff;
+            color: #fff;
+            font-weight: 800;
+            font-size: 10.5px;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 2px 8px rgba(20, 25, 35, 0.3);
+            transition: transform 0.15s ease, background 0.25s ease;
+            font-variant-numeric: tabular-nums;
+        }
+        .pin:hover .pin-bubble { transform: scale(1.25); }
+        .pin.home .pin-bubble {
+            background: var(--navy);
+            font-size: 13px;
+        }
+
+        /* ===== Mobile nav ===== */
+        .mobile-nav {
+            display: none;
+            position: fixed;
+            bottom: calc(12px + var(--sab));
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--navy);
+            border-radius: 999px;
+            padding: 5px;
             gap: 4px;
-            margin-bottom: 8px;
-            flex-wrap: wrap;
+            z-index: 60;
+            box-shadow: var(--shadow-lg);
         }
+        .mobile-nav button {
+            border: none;
+            background: transparent;
+            color: rgba(255,255,255,0.65);
+            font-size: 13px;
+            font-weight: 700;
+            padding: 10px 26px;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .mobile-nav button.active { background: var(--brand); color: #fff; }
 
-        /* MapLibre attribution */
-        .maplibregl-ctrl-attrib { background: rgba(0,0,0,0.5) !important; color: #888 !important; }
-        .maplibregl-ctrl-attrib a { color: #aaa !important; }
-
-        /* Loading */
+        /* ===== Loading ===== */
         .loading {
-            position: absolute;
-            inset: 0;
-            background: var(--bg-0);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
-            gap: 18px;
+            position: fixed; inset: 0;
+            background: var(--bg);
+            display: flex; align-items: center; justify-content: center;
+            flex-direction: column; gap: 16px;
             z-index: 100;
-            transition: opacity 0.6s ease;
+            transition: opacity 0.5s ease;
         }
         .loading.hidden { opacity: 0; pointer-events: none; }
-        .loading .sun-spin {
-            width: 40px; height: 40px;
-            border-radius: 50%;
-            background: radial-gradient(circle at 35% 35%, var(--sun-bright), var(--sun-deep));
-            box-shadow: 0 0 30px var(--sun), 0 0 60px var(--sun-deep);
-            animation: pulse 1.4s ease-in-out infinite;
+        .loading .ball {
+            width: 44px; height: 44px;
+            border-radius: 14px;
+            background: linear-gradient(135deg, var(--gold), var(--brand));
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; font-size: 22px;
+            box-shadow: 0 6px 24px rgba(255, 138, 0, 0.45);
+            animation: bob 1.3s ease-in-out infinite;
         }
-        .loading .txt {
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.22em;
-            color: var(--text-dim);
-            font-weight: 600;
-        }
+        @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+        .loading .t { font-size: 13px; font-weight: 700; color: var(--text-2); }
 
-        @media (max-width: 1100px) {
-            .console { min-width: 0; width: calc(100% - 44px); }
-            .sidebar { width: 300px; }
-        }
-        @media (max-width: 800px) {
-            .sidebar { display: none; }
+        .maplibregl-ctrl-attrib { background: rgba(255,255,255,0.75) !important; }
+
+        /* ===== Responsive ===== */
+        @media (max-width: 900px) {
+            .app {
+                grid-template-rows: 56px 1fr;
+                grid-template-columns: 1fr;
+                grid-template-areas: "header" "main";
+            }
+            .topbar { padding: 0 14px; gap: 10px; }
+            .logo-tag { display: none; }
+            .top-stats .stat-chip:not(.phase) { display: none; }
+            .search-wrap { max-width: none; }
+
+            .panel, .map-area { grid-area: main; }
+            .panel { border-right: none; }
+            body.view-map .panel { display: none; }
+            body.view-list .map-area { visibility: hidden; }
+
+            .mobile-nav { display: flex; }
+            .list { padding-bottom: calc(86px + var(--sab)); }
+
+            .console {
+                bottom: calc(74px + var(--sab));
+                width: calc(100% - 24px);
+                padding: 10px 14px;
+                gap: 10px;
+                flex-wrap: wrap;
+            }
+            .console .date-ctl { order: 2; }
+            .console .console-actions { order: 3; margin-left: auto; }
+            .console .slider-wrap { order: 1; flex-basis: 100%; }
             .legend { display: none; }
-            .console { width: calc(100% - 44px); padding: 10px 14px; gap: 12px; }
-            .date-control { min-width: 90px; }
-            .actions .btn { padding: 6px 10px; font-size: 9.5px; }
+            .map-buttons { top: 12px; right: 12px; }
+            .hero { margin: 12px 12px 0; }
+            .panel-controls { padding: 12px 12px 8px; }
         }
     </style>
 </head>
-<body>
+<body class="view-list">
     <div class="loading" id="loading">
-        <div class="sun-spin"></div>
-        <div class="txt">Loading NYC Sunlight</div>
+        <div class="ball">☀</div>
+        <div class="t">Finding the sun…</div>
     </div>
 
-    <div id="map"></div>
-
-    <div class="top-bar">
-        <div class="brand">
-            <div class="title">
-                <span class="sun-dot"></span>
-                Patio Sun · NYC
-            </div>
-            <div class="sub">Home Base · Windsor Court · 155 E 31st St</div>
-        </div>
-        <div class="top-info">
-            <div class="pill">
-                <span class="label">SUN</span>
-                <span class="swatch" id="sun-swatch"></span>
-                <span class="value" id="sun-pos">—</span>
-            </div>
-            <div class="pill">
-                <span class="label">PHASE</span>
-                <span class="value" id="sun-phase">—</span>
-            </div>
-        </div>
-    </div>
-
-    <div class="map-ui">
-        <button class="btn icon" id="recenter" title="Recenter on Windsor Court">⌂</button>
-        <button class="btn icon" id="toggle-3d" title="Toggle pitch">3D</button>
-        <button class="btn icon" id="toggle-rays" title="Toggle sun rays">☀</button>
-    </div>
-
-    <div class="sidebar">
-        <div class="sidebar-header">
-            <div class="h">Best patios right now</div>
-            <div class="sub" id="ranked-sub">Sorted by sun score · walking from home base</div>
-        </div>
-        <div class="filter-row" id="filters">
-            <div class="chip active" data-filter="all">All</div>
-            <div class="chip" data-filter="rooftop">Rooftop</div>
-            <div class="chip" data-filter="patio">Patio</div>
-            <div class="chip" data-filter="garden">Garden</div>
-            <div class="chip" data-filter="water">Waterfront</div>
-        </div>
-        <div class="patio-list" id="patio-list"></div>
-    </div>
-
-    <div class="legend">
-        <div class="h">Sun Score</div>
-        <div class="legend-row"><span class="legend-dot high"></span>80+ · Direct sun</div>
-        <div class="legend-row"><span class="legend-dot mid"></span>50–80 · Partial</div>
-        <div class="legend-row"><span class="legend-dot low"></span>20–50 · Glow only</div>
-        <div class="legend-row"><span class="legend-dot none"></span>0–20 · Shaded</div>
-        <div class="legend-row home"><span class="legend-dot"></span>Windsor Court</div>
-    </div>
-
-    <div class="controls">
-        <div class="console">
-            <div class="date-control">
-                <label>DATE</label>
-                <input type="date" id="date-input" min="2026-05-01" max="2026-11-01" value="2026-05-10">
-            </div>
-            <div class="slider-wrap">
-                <div class="slider-labels">
-                    <span>RISE <span id="rise-time">—</span></span>
-                    <span class="center">DAYLIGHT<span class="clock" id="clock">—</span></span>
-                    <span>SET <span id="set-time">—</span></span>
-                </div>
-                <div class="slider-track">
-                    <div class="slider-bg"></div>
-                    <div class="slider-marker" id="marker-rise"></div>
-                    <div class="slider-marker golden" id="marker-golden-am"></div>
-                    <div class="slider-marker" id="marker-noon"></div>
-                    <div class="slider-marker golden" id="marker-golden-pm"></div>
-                    <div class="slider-marker" id="marker-set"></div>
-                    <div class="slider-now" id="slider-now"></div>
-                    <input type="range" class="slider" id="time-slider" min="0" max="1439" value="1080" step="1">
+    <div class="app">
+        <header class="topbar">
+            <div class="logo">
+                <div class="logo-mark">☀</div>
+                <div>
+                    <div class="logo-name">Sun<span>Spot</span></div>
+                    <div class="logo-tag">NYC rooftop sun, ranked · from Windsor Court</div>
                 </div>
             </div>
-            <div class="actions">
-                <button class="btn primary" id="golden-hour">Golden Hour</button>
-                <button class="btn icon" id="play">▶</button>
+            <div class="search-wrap">
+                <span class="icon">⌕</span>
+                <input class="search" id="search" type="search" placeholder="Search rooftops, patios, neighborhoods…" autocomplete="off">
             </div>
-        </div>
+            <div class="top-stats">
+                <div class="stat-chip">Sunset <span class="v" id="stat-sunset">—</span></div>
+                <div class="stat-chip">Golden <span class="v" id="stat-golden">—</span></div>
+                <div class="stat-chip phase" id="stat-phase">—</div>
+            </div>
+        </header>
+
+        <aside class="panel">
+            <div class="hero" id="hero">
+                <div class="k">Tonight's pick</div>
+                <div class="pick" id="hero-pick">—</div>
+                <div class="sub" id="hero-sub">—</div>
+            </div>
+            <div class="panel-controls">
+                <div class="chips" id="filters">
+                    <div class="chip active" data-filter="all">All</div>
+                    <div class="chip" data-filter="rooftop">Rooftops</div>
+                    <div class="chip" data-filter="patio">Patios</div>
+                    <div class="chip" data-filter="garden">Gardens</div>
+                    <div class="chip" data-filter="water">Waterfront</div>
+                </div>
+                <div class="list-meta">
+                    <span class="count" id="count">—</span>
+                    <div class="sort">
+                        <button class="active" data-sort="sun" id="sort-sun">Best sun</button>
+                        <button data-sort="walk" id="sort-walk">Nearest</button>
+                    </div>
+                </div>
+            </div>
+            <div class="list" id="list"></div>
+        </aside>
+
+        <main class="map-area">
+            <div id="map"></div>
+            <div id="map-tint"></div>
+            <div class="map-buttons">
+                <button class="map-btn" id="recenter" title="Back to Windsor Court">⌂</button>
+                <button class="map-btn" id="toggle-3d" title="Toggle 3D">3D</button>
+                <button class="map-btn on" id="toggle-rays" title="Toggle sun rays">☀</button>
+            </div>
+            <div class="legend">
+                <div class="h">Sun score</div>
+                <div class="legend-row"><span class="legend-b" style="background:var(--green)">8+</span>Direct sun</div>
+                <div class="legend-row"><span class="legend-b" style="background:var(--green-lt)">6.5</span>Mostly sunny</div>
+                <div class="legend-row"><span class="legend-b" style="background:var(--amber)">4+</span>Some sun</div>
+                <div class="legend-row"><span class="legend-b" style="background:var(--shade)">&lt;4</span>In shade</div>
+                <div class="legend-row"><span class="legend-b" style="background:var(--navy)">⌂</span>Windsor Court</div>
+            </div>
+            <div class="console">
+                <div class="date-ctl">
+                    <label>Date</label>
+                    <input type="date" id="date-input" min="2026-05-01" max="2026-11-01">
+                </div>
+                <div class="slider-wrap">
+                    <div class="slider-top">
+                        <span>RISE <span id="rise-time">—</span></span>
+                        <span class="mid" id="clock">—</span>
+                        <span>SET <span id="set-time">—</span></span>
+                    </div>
+                    <div class="slider-track">
+                        <div class="track-bg"></div>
+                        <div class="tick" id="tick-rise"></div>
+                        <div class="tick" id="tick-noon"></div>
+                        <div class="tick golden" id="tick-golden"></div>
+                        <div class="tick" id="tick-set"></div>
+                        <input type="range" class="slider" id="time-slider" min="0" max="1439" value="1080" step="1">
+                    </div>
+                </div>
+                <div class="console-actions">
+                    <button class="btn" id="now-btn">Now</button>
+                    <button class="btn primary" id="golden-btn">Golden hour</button>
+                    <button class="btn icon" id="play-btn">▶</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div class="mobile-nav">
+        <button class="active" id="nav-list">☰ List</button>
+        <button id="nav-map">⊙ Map</button>
     </div>
 
 <script>
 /* =========================================================================
- * NYC PATIO SUN — Windsor Court Edition
- * Vibe-coded sunset patio finder for NYC. Real sun positioning via SunCalc,
- * 3D dark map via MapLibre + OpenFreeMap, curated rooftops & patios.
+ * SUNSPOT — NYC rooftop sun, ranked. Beli-style bright redesign.
+ * Real solar positions via SunCalc; light 3D map via MapLibre/OpenFreeMap.
+ * Home base: Windsor Court, 155 E 31st St.
  * ========================================================================= */
 
-const HOME = {
-    name: 'Windsor Court',
-    address: '155 E 31st St',
-    lng: -73.98003,
-    lat: 40.74562,
-};
+const HOME = { name: 'Windsor Court', address: '155 E 31st St', lng: -73.98003, lat: 40.74562 };
 
-/* ---------- Patio + rooftop database ----------
- * `face` = unobstructed compass direction(s) the patio opens to (degrees from N).
- * `windows` = array of [minAz, maxAz] in degrees from N where sun reaches the patio.
- * `floor` = approximate floor for the rooftop / patio (used for view weight).
- * `season` = months open (most NYC rooftops are May–Oct).
- */
 const PATIOS = [
-    // --- Midtown / Murray Hill / Flatiron / NoMad (close to Windsor Court) ---
-    { name: 'Magic Hour Rooftop',     addr: '485 7th Ave · Moxy Times Sq', lng: -73.98917, lat: 40.75301, type: 'rooftop', floor: 18, windows: [[120, 320]], vibe: 'Mini-golf carousel under the Empire State.', season: [5,6,7,8,9,10] },
-    { name: 'The Skylark',            addr: '200 W 39th St · 30th fl',     lng: -73.98807, lat: 40.75432, type: 'rooftop', floor: 30, windows: [[150, 320]], vibe: 'Hudson sunsets through 30 floors of glass.', season: [1,2,3,4,5,6,7,8,9,10,11,12] },
-    { name: 'Refinery Rooftop',       addr: '63 W 38th St',                lng: -73.98370, lat: 40.75289, type: 'rooftop', floor: 12, windows: [[90, 270]],  vibe: 'Empire State eye-level. Retractable glass roof.', season: [1,2,3,4,5,6,7,8,9,10,11,12] },
-    { name: '230 Fifth Rooftop',      addr: '230 Fifth Ave',               lng: -73.98801, lat: 40.74411, type: 'rooftop', floor: 20, windows: [[120, 270]], vibe: 'Iconic ESB-and-igloos rooftop, biggest in town.', season: [5,6,7,8,9,10] },
-    { name: 'Salvation Taco @ Pod 39',addr: '145 E 39th St',               lng: -73.97574, lat: 40.74929, type: 'rooftop', floor: 17, windows: [[60, 300]],  vibe: 'Hidden tile-clad terrace, three blocks from home.', season: [4,5,6,7,8,9,10] },
-    { name: 'Birreria @ Eataly',      addr: '200 5th Ave · 14th fl',       lng: -73.98971, lat: 40.74210, type: 'rooftop', floor: 14, windows: [[120, 320]], vibe: 'Open-air brewpub above Flatiron.', season: [1,2,3,4,5,6,7,8,9,10,11,12] },
-    { name: 'Serra by Birreria',      addr: '200 5th Ave · 14th fl',       lng: -73.98971, lat: 40.74220, type: 'rooftop', floor: 14, windows: [[120, 320]], vibe: 'Seasonal greenhouse rooftop, vines + pasta.', season: [4,5,6,7,8,9,10] },
-    { name: 'Upstairs at the Kimberly',addr: '145 E 50th St · 30th fl',    lng: -73.97114, lat: 40.75633, type: 'rooftop', floor: 30, windows: [[180, 340]], vibe: 'Glass solarium, Chrysler Building face-to-face.', season: [1,2,3,4,5,6,7,8,9,10,11,12] },
-    { name: 'Pebble Bar',             addr: '67 W 49th St',                lng: -73.97917, lat: 40.75909, type: 'patio',  floor: 3,  windows: [[90, 270]],  vibe: 'Townhouse cocktails opposite 30 Rock.', season: [1,2,3,4,5,6,7,8,9,10,11,12] },
-    { name: 'Bar SixtyFive',          addr: '30 Rockefeller · 65th fl',    lng: -73.97874, lat: 40.75898, type: 'rooftop', floor: 65, windows: [[0, 360]],   vibe: 'Rainbow Room sunset, jacket required.', season: [1,2,3,4,5,6,7,8,9,10,11,12] },
-    { name: 'Castell Rooftop',        addr: '842 6th Ave · 21st fl',       lng: -73.98873, lat: 40.74605, type: 'rooftop', floor: 21, windows: [[150, 320]], vibe: 'Spanish small plates, Empire State framed.', season: [4,5,6,7,8,9,10] },
-    { name: 'St. Cloud Rooftop',      addr: '6 Times Sq · Knickerbocker',  lng: -73.98624, lat: 40.75557, type: 'rooftop', floor: 16, windows: [[120, 290]], vibe: 'Times Square ball-drop view, low-key.', season: [1,2,3,4,5,6,7,8,9,10,11,12] },
-    { name: 'Haven Rooftop',          addr: '132 W 47th St',               lng: -73.98397, lat: 40.75898, type: 'rooftop', floor: 14, windows: [[100, 290]], vibe: 'Lush plants, all-day sun on the brunch deck.', season: [1,2,3,4,5,6,7,8,9,10,11,12] },
-    { name: 'The Roof at Park South', addr: '125 E 27th St',               lng: -73.98259, lat: 40.74257, type: 'rooftop', floor: 16, windows: [[120, 320]], vibe: 'Quiet NoMad rooftop, sneaky Empire State pop-up.', season: [4,5,6,7,8,9,10] },
-    { name: 'Loft & Garden @ 620',    addr: '620 Fifth Ave · Rockefeller', lng: -73.97920, lat: 40.75857, type: 'garden',  floor: 9,  windows: [[120, 320]], vibe: 'Members-only cathedral garden, sun on stone.', season: [4,5,6,7,8,9,10] },
-
-    // --- Lower East / SoHo / Bowery ---
-    { name: 'The Crown',              addr: '50 Bowery · 21st fl',         lng: -73.99621, lat: 40.71629, type: 'rooftop', floor: 21, windows: [[60, 320]],  vibe: '360° glass box over Chinatown.', season: [1,2,3,4,5,6,7,8,9,10,11,12] },
-    { name: 'Mr. Purple',             addr: '180 Orchard St · 15th fl',    lng: -73.98843, lat: 40.72223, type: 'rooftop', floor: 15, windows: [[180, 330]], vibe: 'Pool-deck vibes, west sun framed by Empire State.', season: [1,2,3,4,5,6,7,8,9,10,11,12] },
-    { name: 'The Roof @ Public',      addr: '215 Chrystie St · 18th fl',   lng: -73.99253, lat: 40.72346, type: 'rooftop', floor: 18, windows: [[60, 320]],  vibe: 'Ian Schrager penthouse, fireplace + skyline.', season: [1,2,3,4,5,6,7,8,9,10,11,12] },
-
-    // --- Hudson / West Side ---
-    { name: 'The Press Lounge',       addr: '653 11th Ave · 16th fl',      lng: -73.99453, lat: 40.76513, type: 'rooftop', floor: 16, windows: [[180, 340]], vibe: 'Direct Hudson sunset over the river.', season: [1,2,3,4,5,6,7,8,9,10,11,12] },
-    { name: 'Le Bain @ Standard',     addr: '848 Washington St',           lng: -74.00831, lat: 40.74062, type: 'rooftop', floor: 18, windows: [[180, 340]], vibe: 'High Line dance floor, hot tub on the roof.', season: [1,2,3,4,5,6,7,8,9,10,11,12] },
-    { name: 'Gallow Green',           addr: '542 W 27th St · McKittrick',  lng: -74.00420, lat: 40.75102, type: 'garden',  floor: 6,  windows: [[90, 290]],  vibe: 'Overgrown abandoned-railway garden bar.', season: [4,5,6,7,8,9,10] },
-    { name: 'The Frying Pan',         addr: 'Pier 66 · W 26th St',         lng: -74.00982, lat: 40.75324, type: 'water',   floor: 1,  windows: [[120, 340]], vibe: 'Rusty boat-bar on the Hudson, peak summer chaos.', season: [4,5,6,7,8,9,10] },
-    { name: 'Grand Banks',            addr: 'Pier 25 · TriBeCa',           lng: -74.01446, lat: 40.72120, type: 'water',   floor: 1,  windows: [[150, 320]], vibe: 'Oyster schooner moored against the sunset.', season: [4,5,6,7,8,9,10] },
-    { name: 'Loopy Doopy @ Conrad',   addr: '102 North End Ave · 16th fl', lng: -74.01556, lat: 40.71519, type: 'rooftop', floor: 16, windows: [[180, 340]], vibe: 'Boozy popsicle in champagne, Hudson straight ahead.', season: [4,5,6,7,8,9,10] },
-
-    // --- Lower Manhattan / Seaport ---
-    { name: 'The Greens @ Pier 17',   addr: '89 South St',                 lng: -74.00301, lat: 40.70621, type: 'rooftop', floor: 4,  windows: [[60, 240]],  vibe: 'Astroturf cabanas, Brooklyn Bridge backdrop.', season: [4,5,6,7,8,9,10] },
-
-    // --- Brooklyn waterfront (Manhattan-facing sunset) ---
-    { name: 'Bar Blondeau @ Wythe',   addr: '80 Wythe Ave · Williamsburg', lng: -73.95770, lat: 40.72185, type: 'rooftop', floor: 6,  windows: [[200, 340]], vibe: 'Manhattan skyline lit on fire at sunset.', season: [1,2,3,4,5,6,7,8,9,10,11,12] },
-    { name: 'Westlight',              addr: '111 N 12th St · William Vale',lng: -73.95857, lat: 40.72190, type: 'rooftop', floor: 22, windows: [[0, 360]],   vibe: '22 floors above Williamsburg, full panorama.', season: [1,2,3,4,5,6,7,8,9,10,11,12] },
-
-    // --- Uptown ---
-    { name: 'Cantor Roof Garden',     addr: 'The Met · 1000 Fifth Ave',    lng: -73.96320, lat: 40.77939, type: 'garden',  floor: 5,  windows: [[120, 320]], vibe: 'Central Park canopy under your martini.', season: [4,5,6,7,8,9,10] },
+    { name: 'Magic Hour Rooftop',      addr: '485 7th Ave · Moxy Times Sq', hood: 'Garment District', lng: -73.98917, lat: 40.75301, type: 'rooftop', floor: 18, windows: [[120, 320]], vibe: 'Mini-golf carousel under the Empire State.', season: [5,6,7,8,9,10] },
+    { name: 'The Skylark',             addr: '200 W 39th St · 30th fl',     hood: 'Garment District', lng: -73.98807, lat: 40.75432, type: 'rooftop', floor: 30, windows: [[150, 320]], vibe: 'Hudson sunsets through 30 floors of glass.', season: [1,2,3,4,5,6,7,8,9,10,11,12] },
+    { name: 'Refinery Rooftop',        addr: '63 W 38th St',                hood: 'Bryant Park',      lng: -73.98370, lat: 40.75289, type: 'rooftop', floor: 12, windows: [[90, 270]],  vibe: 'Empire State eye-level. Retractable glass roof.', season: [1,2,3,4,5,6,7,8,9,10,11,12] },
+    { name: '230 Fifth Rooftop',       addr: '230 Fifth Ave',               hood: 'NoMad',            lng: -73.98801, lat: 40.74411, type: 'rooftop', floor: 20, windows: [[120, 270]], vibe: 'Iconic ESB-and-igloos rooftop, biggest in town.', season: [5,6,7,8,9,10] },
+    { name: 'Salvation Taco @ Pod 39', addr: '145 E 39th St',               hood: 'Murray Hill',      lng: -73.97574, lat: 40.74929, type: 'rooftop', floor: 17, windows: [[60, 300]],  vibe: 'Hidden tile-clad terrace, three blocks from home.', season: [4,5,6,7,8,9,10] },
+    { name: 'Birreria @ Eataly',       addr: '200 5th Ave · 14th fl',       hood: 'Flatiron',         lng: -73.98971, lat: 40.74210, type: 'rooftop', floor: 14, windows: [[120, 320]], vibe: 'Open-air brewpub above Flatiron.', season: [1,2,3,4,5,6,7,8,9,10,11,12] },
+    { name: 'Serra by Birreria',       addr: '200 5th Ave · 14th fl',       hood: 'Flatiron',         lng: -73.98971, lat: 40.74220, type: 'rooftop', floor: 14, windows: [[120, 320]], vibe: 'Seasonal greenhouse rooftop, vines + pasta.', season: [4,5,6,7,8,9,10] },
+    { name: 'Upstairs at the Kimberly',addr: '145 E 50th St · 30th fl',     hood: 'Midtown East',     lng: -73.97114, lat: 40.75633, type: 'rooftop', floor: 30, windows: [[180, 340]], vibe: 'Glass solarium, Chrysler Building face-to-face.', season: [1,2,3,4,5,6,7,8,9,10,11,12] },
+    { name: 'Pebble Bar',              addr: '67 W 49th St',                hood: 'Rockefeller Ctr',  lng: -73.97917, lat: 40.75909, type: 'patio',  floor: 3,  windows: [[90, 270]],  vibe: 'Townhouse cocktails opposite 30 Rock.', season: [1,2,3,4,5,6,7,8,9,10,11,12] },
+    { name: 'Bar SixtyFive',           addr: '30 Rockefeller · 65th fl',    hood: 'Rockefeller Ctr',  lng: -73.97874, lat: 40.75898, type: 'rooftop', floor: 65, windows: [[0, 360]],   vibe: 'Rainbow Room sunset, jacket required.', season: [1,2,3,4,5,6,7,8,9,10,11,12] },
+    { name: 'Castell Rooftop',         addr: '842 6th Ave · 21st fl',       hood: 'NoMad',            lng: -73.98873, lat: 40.74605, type: 'rooftop', floor: 21, windows: [[150, 320]], vibe: 'Spanish small plates, Empire State framed.', season: [4,5,6,7,8,9,10] },
+    { name: 'St. Cloud Rooftop',       addr: '6 Times Sq · Knickerbocker',  hood: 'Times Square',     lng: -73.98624, lat: 40.75557, type: 'rooftop', floor: 16, windows: [[120, 290]], vibe: 'Times Square ball-drop view, low-key.', season: [1,2,3,4,5,6,7,8,9,10,11,12] },
+    { name: 'Haven Rooftop',           addr: '132 W 47th St',               hood: 'Times Square',     lng: -73.98397, lat: 40.75898, type: 'rooftop', floor: 14, windows: [[100, 290]], vibe: 'Lush plants, all-day sun on the brunch deck.', season: [1,2,3,4,5,6,7,8,9,10,11,12] },
+    { name: 'The Roof at Park South',  addr: '125 E 27th St',               hood: 'NoMad',            lng: -73.98259, lat: 40.74257, type: 'rooftop', floor: 16, windows: [[120, 320]], vibe: 'Quiet NoMad rooftop, sneaky Empire State pop-up.', season: [4,5,6,7,8,9,10] },
+    { name: 'Loft & Garden @ 620',     addr: '620 Fifth Ave · Rockefeller', hood: 'Rockefeller Ctr',  lng: -73.97920, lat: 40.75857, type: 'garden', floor: 9,  windows: [[120, 320]], vibe: 'Cathedral-view garden, sun on stone.', season: [4,5,6,7,8,9,10] },
+    { name: 'The Crown',               addr: '50 Bowery · 21st fl',         hood: 'Chinatown',        lng: -73.99621, lat: 40.71629, type: 'rooftop', floor: 21, windows: [[60, 320]],  vibe: '360° glass box over Chinatown.', season: [1,2,3,4,5,6,7,8,9,10,11,12] },
+    { name: 'Mr. Purple',              addr: '180 Orchard St · 15th fl',    hood: 'Lower East Side',  lng: -73.98843, lat: 40.72223, type: 'rooftop', floor: 15, windows: [[180, 330]], vibe: 'Pool-deck vibes, west sun framed by Empire State.', season: [1,2,3,4,5,6,7,8,9,10,11,12] },
+    { name: 'The Roof @ Public',       addr: '215 Chrystie St · 18th fl',   hood: 'Nolita',           lng: -73.99253, lat: 40.72346, type: 'rooftop', floor: 18, windows: [[60, 320]],  vibe: 'Ian Schrager penthouse, fireplace + skyline.', season: [1,2,3,4,5,6,7,8,9,10,11,12] },
+    { name: 'The Press Lounge',        addr: '653 11th Ave · 16th fl',      hood: "Hell's Kitchen",   lng: -73.99453, lat: 40.76513, type: 'rooftop', floor: 16, windows: [[180, 340]], vibe: 'Direct Hudson sunset over the river.', season: [1,2,3,4,5,6,7,8,9,10,11,12] },
+    { name: 'Le Bain @ The Standard',  addr: '848 Washington St',           hood: 'Meatpacking',      lng: -74.00831, lat: 40.74062, type: 'rooftop', floor: 18, windows: [[180, 340]], vibe: 'High Line dance floor, hot tub on the roof.', season: [1,2,3,4,5,6,7,8,9,10,11,12] },
+    { name: 'Gallow Green',            addr: '542 W 27th St · McKittrick',  hood: 'West Chelsea',     lng: -74.00420, lat: 40.75102, type: 'garden', floor: 6,  windows: [[90, 290]],  vibe: 'Overgrown abandoned-railway garden bar.', season: [4,5,6,7,8,9,10] },
+    { name: 'The Frying Pan',          addr: 'Pier 66 · W 26th St',         hood: 'Hudson River Park',lng: -74.00982, lat: 40.75324, type: 'water',  floor: 1,  windows: [[120, 340]], vibe: 'Rusty boat-bar on the Hudson, peak summer chaos.', season: [4,5,6,7,8,9,10] },
+    { name: 'Grand Banks',             addr: 'Pier 25 · TriBeCa',           hood: 'TriBeCa',          lng: -74.01446, lat: 40.72120, type: 'water',  floor: 1,  windows: [[150, 320]], vibe: 'Oyster schooner moored against the sunset.', season: [4,5,6,7,8,9,10] },
+    { name: 'Loopy Doopy @ Conrad',    addr: '102 North End Ave · 16th fl', hood: 'Battery Park City',lng: -74.01556, lat: 40.71519, type: 'rooftop', floor: 16, windows: [[180, 340]], vibe: 'Boozy popsicle in champagne, Hudson straight ahead.', season: [4,5,6,7,8,9,10] },
+    { name: 'The Greens @ Pier 17',    addr: '89 South St',                 hood: 'Seaport',          lng: -74.00301, lat: 40.70621, type: 'rooftop', floor: 4,  windows: [[60, 240]],  vibe: 'Mini-lawn cabanas, Brooklyn Bridge backdrop.', season: [4,5,6,7,8,9,10] },
+    { name: 'Bar Blondeau',            addr: '80 Wythe Ave · 6th fl',       hood: 'Williamsburg',     lng: -73.95770, lat: 40.72185, type: 'rooftop', floor: 6,  windows: [[200, 340]], vibe: 'Manhattan skyline lit on fire at sunset.', season: [1,2,3,4,5,6,7,8,9,10,11,12] },
+    { name: 'Westlight',               addr: '111 N 12th St · 22nd fl',     hood: 'Williamsburg',     lng: -73.95857, lat: 40.72190, type: 'rooftop', floor: 22, windows: [[0, 360]],   vibe: '22 floors above Williamsburg, full panorama.', season: [1,2,3,4,5,6,7,8,9,10,11,12] },
+    { name: 'Cantor Roof Garden',      addr: 'The Met · 1000 Fifth Ave',    hood: 'Upper East Side',  lng: -73.96320, lat: 40.77939, type: 'garden', floor: 5,  windows: [[120, 320]], vibe: 'Central Park canopy under your martini.', season: [4,5,6,7,8,9,10] },
 ];
 
-/* ============= MAP SETUP ============= */
+/* ============= STATE ============= */
+const state = {
+    date: new Date(),
+    minutes: 18 * 60,
+    filter: 'all',
+    sort: 'sun',
+    query: '',
+    activePatio: null,
+    playing: false,
+    playInterval: null,
+    raysOn: true,
+};
+
+/* ============= MAP ============= */
 const map = new maplibregl.Map({
     container: 'map',
     style: 'https://tiles.openfreemap.org/styles/positron',
     center: [HOME.lng, HOME.lat],
-    zoom: 15.2,
-    pitch: 62,
-    bearing: -22,
+    zoom: 13.6,
+    pitch: 52,
+    bearing: -16,
     antialias: true,
-    maxPitch: 75,
+    maxPitch: 72,
 });
-
 map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-left');
 
 let buildingsLayerId = null;
-let raysOn = true;
 
-map.on('load', async () => {
-    /* Recolor base style → moody dark navy */
-    const layers = map.getStyle().layers || [];
-    layers.forEach(l => {
-        try {
-            if (l.type === 'background') map.setPaintProperty(l.id, 'background-color', '#06070d');
-            if (l.id.includes('water'))  map.setPaintProperty(l.id, 'fill-color', '#040814');
-            if (l.id.includes('park') || l.id.includes('green') || l.id.includes('wood'))
-                map.setPaintProperty(l.id, 'fill-color', '#0c1418');
-            if (l.id.includes('beach') || l.id.includes('sand'))
-                map.setPaintProperty(l.id, 'fill-color', '#15140e');
-            if (l.id.includes('landuse') || l.id.includes('land-')) {
-                if (l.type === 'fill') map.setPaintProperty(l.id, 'fill-color', '#0a0b14');
-            }
-            if (l.type === 'line' && (l.id.includes('road') || l.id.includes('street') || l.id.includes('highway') || l.id.includes('motorway') || l.id.includes('transport'))) {
-                map.setPaintProperty(l.id, 'line-color', '#171a26');
-            }
-            if (l.type === 'symbol') {
-                try { map.setPaintProperty(l.id, 'text-color', '#7a7a90'); } catch(e){}
-                try { map.setPaintProperty(l.id, 'text-halo-color', '#06070d'); } catch(e){}
-                try { map.setPaintProperty(l.id, 'text-halo-width', 1.4); } catch(e){}
-            }
-            if (l.id.includes('building')) {
-                try { map.setPaintProperty(l.id, 'fill-color', '#10121e'); } catch(e){}
-            }
-        } catch(e) {}
-    });
-
-    /* Add 3D building extrusions. OpenFreeMap (Shortbread schema) puts buildings
-     * in a `building` source-layer. We try common source names. */
+map.on('load', () => {
+    /* 3D buildings on the light basemap, shaded by real sun light */
     const sources = map.getStyle().sources || {};
-    const sourceCandidates = Object.keys(sources).filter(s => sources[s].type === 'vector');
-    let buildingSource = null, buildingLayer = null;
-    for (const s of sourceCandidates) {
-        const src = map.getSource(s);
-        const ids = src && src.vectorLayerIds;
+    const vecs = Object.keys(sources).filter(s => sources[s].type === 'vector');
+    let bSource = null, bLayer = null;
+    for (const s of vecs) {
+        const ids = map.getSource(s)?.vectorLayerIds;
         if (!ids) continue;
-        if (ids.includes('building')) { buildingSource = s; buildingLayer = 'building'; break; }
-        if (ids.includes('buildings')) { buildingSource = s; buildingLayer = 'buildings'; break; }
+        if (ids.includes('building')) { bSource = s; bLayer = 'building'; break; }
+        if (ids.includes('buildings')) { bSource = s; bLayer = 'buildings'; break; }
     }
-    if (!buildingSource && sourceCandidates.length) {
-        // best-guess: most providers call it 'building'
-        buildingSource = sourceCandidates[0];
-        buildingLayer = 'building';
-    }
+    if (!bSource && vecs.length) { bSource = vecs[0]; bLayer = 'building'; }
 
-    if (buildingSource) {
+    if (bSource) {
         buildingsLayerId = '3d-buildings';
         try {
             map.addLayer({
                 id: buildingsLayerId,
                 type: 'fill-extrusion',
-                source: buildingSource,
-                'source-layer': buildingLayer,
+                source: bSource,
+                'source-layer': bLayer,
                 minzoom: 13,
                 paint: {
-                    'fill-extrusion-color': [
-                        'interpolate', ['linear'], ['zoom'],
-                        13, '#15172a',
-                        17, '#23253c'
-                    ],
-                    'fill-extrusion-height': [
-                        'coalesce',
-                        ['get', 'render_height'],
-                        ['get', 'height'],
-                        ['*', ['coalesce', ['get', 'levels'], 3], 3.2],
-                        12
-                    ],
-                    'fill-extrusion-base': [
-                        'coalesce',
-                        ['get', 'render_min_height'],
-                        ['get', 'min_height'],
-                        0
-                    ],
-                    'fill-extrusion-opacity': 0.92,
+                    'fill-extrusion-color': '#ece7de',
+                    'fill-extrusion-height': ['coalesce', ['get', 'render_height'], ['get', 'height'], ['*', ['coalesce', ['get', 'levels'], 3], 3.2], 12],
+                    'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], ['get', 'min_height'], 0],
+                    'fill-extrusion-opacity': 0.88,
                 }
             });
-        } catch (e) { console.warn('No 3D buildings available:', e); }
+        } catch (e) { console.warn('3D buildings unavailable:', e); }
     }
 
-    addPatioMarkers();
-    addHomeMarker();
-    addSunRays();
-    addHomeRing();
-    update();
+    map.addSource('sun-rays', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    map.addLayer({
+        id: 'sun-rays-line', type: 'line', source: 'sun-rays',
+        paint: { 'line-color': '#ff9e2c', 'line-width': ['get', 'width'], 'line-opacity': ['get', 'opacity'], 'line-blur': 0.8 }
+    });
 
+    addWalkRings();
+    addPins();
+    update();
     setTimeout(() => document.getElementById('loading').classList.add('hidden'), 250);
 });
 
-/* ============= MARKERS ============= */
-const markers = new Map(); // patio name → { marker, el }
-
-function makeMarkerEl() {
-    const el = document.createElement('div');
-    el.className = 'sun-marker';
-    const dot = document.createElement('div');
-    dot.className = 'sun-dot';
-    el.appendChild(dot);
-    return { el, dot };
+function circleCoords(lng, lat, km, n = 64) {
+    const out = [];
+    const dLat = km / 110.574, dLng = km / (111.32 * Math.cos(lat * Math.PI / 180));
+    for (let i = 0; i <= n; i++) {
+        const a = (i / n) * 2 * Math.PI;
+        out.push([lng + dLng * Math.cos(a), lat + dLat * Math.sin(a)]);
+    }
+    return out;
 }
 
-function addPatioMarkers() {
-    PATIOS.forEach((p, i) => {
-        const { el, dot } = makeMarkerEl();
-        el.title = `${p.name} · ${p.addr}`;
-        el.addEventListener('click', (ev) => { ev.stopPropagation(); openPopup(p); flashPatioInList(p); });
-        const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
-            .setLngLat([p.lng, p.lat])
-            .addTo(map);
-        markers.set(p.name, { marker, el, dot });
-    });
-}
-
-function addHomeMarker() {
-    const el = document.createElement('div');
-    el.className = 'sun-marker home';
-    el.title = `${HOME.name} · ${HOME.address}`;
-    const dot = document.createElement('div');
-    dot.className = 'sun-dot';
-    el.appendChild(dot);
-    new maplibregl.Marker({ element: el, anchor: 'center' })
-        .setLngLat([HOME.lng, HOME.lat])
-        .addTo(map);
-}
-
-/* Concentric reach circles around home (5 / 10 / 20 min walk) */
-function addHomeRing() {
-    const ring = (km, color, width) => ({
-        type: 'Feature',
-        properties: {},
-        geometry: {
-            type: 'Polygon',
-            coordinates: [circleCoords(HOME.lng, HOME.lat, km)]
-        }
-    });
-    map.addSource('home-rings', {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: [
-            ring(0.4), ring(0.8), ring(1.6)
-        ]}
-    });
+function addWalkRings() {
+    const ring = km => ({ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [circleCoords(HOME.lng, HOME.lat, km)] } });
+    map.addSource('walk-rings', { type: 'geojson', data: { type: 'FeatureCollection', features: [ring(0.4), ring(0.8), ring(1.6)] } });
     map.addLayer({
-        id: 'home-rings-line',
-        type: 'line',
-        source: 'home-rings',
-        paint: {
-            'line-color': '#ffffff',
-            'line-opacity': 0.08,
-            'line-width': 1,
-            'line-dasharray': [2, 4]
-        }
+        id: 'walk-rings-line', type: 'line', source: 'walk-rings',
+        paint: { 'line-color': '#14233c', 'line-opacity': 0.14, 'line-width': 1.2, 'line-dasharray': [2, 4] }
     }, buildingsLayerId || undefined);
 }
 
-function circleCoords(lng, lat, km, n = 64) {
-    const coords = [];
-    const dLat = km / 110.574;
-    const dLng = km / (111.320 * Math.cos(lat * Math.PI / 180));
-    for (let i = 0; i <= n; i++) {
-        const a = (i / n) * 2 * Math.PI;
-        coords.push([lng + dLng * Math.cos(a), lat + dLat * Math.sin(a)]);
-    }
-    return coords;
-}
+/* ============= PINS ============= */
+const pins = new Map();
 
-/* ============= SUN RAYS LAYER (visualizes light direction) ============= */
-function addSunRays() {
-    map.addSource('sun-rays', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-    map.addLayer({
-        id: 'sun-rays-line',
-        type: 'line',
-        source: 'sun-rays',
-        paint: {
-            'line-color': ['get', 'color'],
-            'line-width': ['get', 'width'],
-            'line-opacity': ['get', 'opacity'],
-            'line-blur': 1,
-        }
+function addPins() {
+    PATIOS.forEach(p => {
+        const el = document.createElement('div');
+        el.className = 'pin';
+        const bubble = document.createElement('div');
+        bubble.className = 'pin-bubble';
+        el.appendChild(bubble);
+        el.title = `${p.name} · ${p.hood}`;
+        el.addEventListener('click', ev => { ev.stopPropagation(); selectPatio(p, false); });
+        const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+            .setLngLat([p.lng, p.lat]).addTo(map);
+        pins.set(p.name, { marker, el, bubble });
     });
-}
 
-function updateSunRays(sunPos, scoredList) {
-    if (!map.getSource('sun-rays')) return;
-    if (!raysOn || sunPos.altitude < 0) {
-        map.getSource('sun-rays').setData({ type: 'FeatureCollection', features: [] });
-        return;
-    }
-    // sun azimuth from N clockwise (deg)
-    const azDeg = (sunPos.azimuth * 180 / Math.PI + 180 + 360) % 360;
-    const dx = Math.sin(azDeg * Math.PI / 180);  // east component
-    const dy = Math.cos(azDeg * Math.PI / 180);  // north component
-    // ray length in degrees (roughly 250m → enough to be visible)
-    const reach = 0.0022;
-    // Draw a ray from each well-lit patio in the direction OF the sun (where light is coming from)
-    const features = [];
-    scoredList.forEach(({ p, score }) => {
-        if (score < 35) return;
-        const sx = p.lng + dx * reach;       // ray starts from light source side
-        const sy = p.lat + dy * reach;
-        features.push({
-            type: 'Feature',
-            properties: {
-                color: scoreColor(score),
-                width: 1 + score / 50,
-                opacity: 0.18 + (score / 200),
-            },
-            geometry: { type: 'LineString', coordinates: [[sx, sy], [p.lng, p.lat]] }
-        });
-    });
-    map.getSource('sun-rays').setData({ type: 'FeatureCollection', features });
+    const hel = document.createElement('div');
+    hel.className = 'pin home';
+    const hb = document.createElement('div');
+    hb.className = 'pin-bubble';
+    hb.textContent = '⌂';
+    hel.appendChild(hb);
+    hel.title = `${HOME.name} · ${HOME.address}`;
+    new maplibregl.Marker({ element: hel, anchor: 'center' })
+        .setLngLat([HOME.lng, HOME.lat]).addTo(map);
 }
-
-/* ============= STATE ============= */
-const state = {
-    date: new Date('2026-05-10T00:00:00-04:00'),
-    minutes: 18 * 60,           // 6:00 PM default
-    filter: 'all',
-    activePatio: null,
-    playing: false,
-    playInterval: null,
-};
 
 /* ============= SUN MATH ============= */
 function currentDateTime() {
     const d = new Date(state.date);
-    d.setHours(Math.floor(state.minutes / 60));
-    d.setMinutes(state.minutes % 60);
-    d.setSeconds(0);
+    d.setHours(Math.floor(state.minutes / 60), state.minutes % 60, 0, 0);
     return d;
 }
 
-/* score: 0–100, how good is the sun on this patio's open windows right now? */
 function sunScore(patio, when) {
-    // out of season → 0
     const month = when.getMonth() + 1;
-    if (patio.season && !patio.season.includes(month)) return 0;
+    if (patio.season && !patio.season.includes(month)) return -1;   // closed
 
     const sun = SunCalc.getPosition(when, patio.lat, patio.lng);
     const altDeg = sun.altitude * 180 / Math.PI;
     if (altDeg < -3) return 0;
-
-    // sun azimuth (from N clockwise, 0–360)
     const azDeg = (sun.azimuth * 180 / Math.PI + 180 + 360) % 360;
 
-    // window match
     let inWindow = false;
     for (const [a, b] of patio.windows) {
         if (a <= b) { if (azDeg >= a && azDeg <= b) inWindow = true; }
@@ -1104,337 +1001,299 @@ function sunScore(patio, when) {
     }
 
     if (altDeg < 0) {
-        // twilight glow only
-        const glow = Math.max(0, (altDeg + 3) / 3) * 22;   // 0–22
+        const glow = Math.max(0, (altDeg + 3) / 3) * 22;
         return Math.round(glow * (inWindow ? 1 : 0.55));
     }
 
     let score;
     if (altDeg > 45) {
-        // overhead sun — most patios get full sun, but a rooftop is best
         score = 70 + (patio.type === 'rooftop' ? 12 : 0);
     } else if (altDeg > 12) {
         score = 60 + (inWindow ? 18 : -10);
-        // golden-hour bonus: low sun, sun in window → magic
     } else {
-        // low-angle sun — direction matters a lot
-        const goldenBoost = inWindow ? 32 : -8;
-        score = 50 + goldenBoost + Math.max(0, (12 - altDeg)) * 0.8;
-        // rooftops crush it because nothing blocks them
+        score = 50 + (inWindow ? 32 : -8) + Math.max(0, 12 - altDeg) * 0.8;
         if (patio.type === 'rooftop' && inWindow) score += 8;
-        if (patio.type === 'water' && inWindow)   score += 6;
+        if (patio.type === 'water' && inWindow) score += 6;
     }
-
-    // gently penalize heavily-blocked patios when sun isn't in any window
     if (!inWindow) score -= 12;
-
-    // clamp
     return Math.max(0, Math.min(100, Math.round(score)));
 }
 
-/* Score → color buckets match the legend exactly (80 / 50 / 20 thresholds). */
-function scoreColor(s) {
-    if (s >= 80) return '#ffd066';   // direct sun
-    if (s >= 50) return '#ff9148';   // partial
-    if (s >= 20) return '#7a5878';   // glow only
-    return '#2c2c40';                // shaded
+/* Beli-style bubble color buckets (display scale = score/10) */
+function bubbleColor(s) {
+    if (s < 0) return '#d4d8de';
+    if (s >= 80) return '#128a52';
+    if (s >= 65) return '#7cb342';
+    if (s >= 40) return '#f5a623';
+    return '#aeb6bf';
 }
-function scoreGradient(s) {
-    if (s >= 80) return 'radial-gradient(circle at 30% 30%, #ffe9a8, #ffd066)';
-    if (s >= 50) return 'radial-gradient(circle at 30% 30%, #ffc28a, #ff9148)';
-    if (s >= 20) return 'radial-gradient(circle at 30% 30%, #9a7898, #7a5878)';
-    return '#2c2c40';
-}
-function scoreGlow(s) {
-    if (s >= 80) return '0 0 14px #ffd066, 0 0 26px rgba(255,170,68,0.55)';
-    if (s >= 50) return '0 0 10px #ff9148, 0 0 18px rgba(255,138,61,0.45)';
-    if (s >= 20) return '0 0 4px rgba(122,88,120,0.45)';
-    return 'none';
+function displayScore(s) { return s < 0 ? '–' : (s / 10).toFixed(1); }
+
+/* Daily sun window per patio: when does score stay ≥ 50? */
+let sunWindows = new Map();
+function computeSunWindows() {
+    sunWindows = new Map();
+    PATIOS.forEach(p => {
+        let from = null, to = null, closed = false;
+        const d = new Date(state.date);
+        if (p.season && !p.season.includes(d.getMonth() + 1)) { sunWindows.set(p.name, { closed: true }); return; }
+        for (let m = 11 * 60; m <= 21.5 * 60; m += 5) {
+            const t = new Date(state.date);
+            t.setHours(Math.floor(m / 60), m % 60, 0, 0);
+            if (sunScore(p, t) >= 50) {
+                if (!from) from = new Date(t);
+                to = new Date(t);
+            }
+        }
+        sunWindows.set(p.name, { from, to, closed });
+    });
 }
 
-/* ============= MAP LIGHT (drives 3D building shading) ============= */
+/* ============= MAP LIGHT + TINT ============= */
 function applyMapLight(when) {
     const sun = SunCalc.getPosition(when, HOME.lat, HOME.lng);
     const altDeg = sun.altitude * 180 / Math.PI;
-    // azimuth from N clockwise → MapLibre default light azimuth ref is North (anchor=map)
     const azDeg = (sun.azimuth * 180 / Math.PI + 180 + 360) % 360;
+    const tint = document.getElementById('map-tint');
 
-    // Below horizon: switch to cool ambient
-    if (altDeg < -6) {
-        try { map.setLight({ anchor: 'map', color: '#3a4880', intensity: 0.18, position: [1.2, 0, 80] }); } catch(e){}
-        return { color: '#1a2244', altDeg, azDeg };
-    }
-
-    // Color temperature shifts with altitude
     let color, intensity;
-    if (altDeg < 0) {        // civil twilight
-        color = '#b06aa8';
-        intensity = 0.28;
-    } else if (altDeg < 6) { // sunset / sunrise
-        color = '#ff5a2a';
-        intensity = 0.55;
-    } else if (altDeg < 14) { // golden hour
-        color = '#ff9148';
-        intensity = 0.75;
-    } else if (altDeg < 30) {
-        color = '#ffc170';
-        intensity = 0.8;
-    } else {
-        color = '#fff1c8';
-        intensity = 0.85;
-    }
+    if (altDeg < -6)      { color = '#aab6d4'; intensity = 0.12; tint.style.background = 'rgba(18, 28, 58, 0.35)'; }
+    else if (altDeg < 0)  { color = '#c9a8d8'; intensity = 0.3;  tint.style.background = 'rgba(120, 80, 150, 0.16)'; }
+    else if (altDeg < 6)  { color = '#ff8c4a'; intensity = 0.6;  tint.style.background = 'rgba(255, 115, 40, 0.12)'; }
+    else if (altDeg < 14) { color = '#ffb35c'; intensity = 0.66; tint.style.background = 'rgba(255, 170, 60, 0.08)'; }
+    else if (altDeg < 30) { color = '#ffd391'; intensity = 0.6;  tint.style.background = 'transparent'; }
+    else                  { color = '#fff3d6'; intensity = 0.5;  tint.style.background = 'transparent'; }
 
     const polar = Math.max(5, Math.min(85, 90 - altDeg));
-    try {
-        map.setLight({
-            anchor: 'map',
-            color: color,
-            intensity: intensity,
-            position: [1.4, azDeg, polar]
-        });
-    } catch(e){}
-
-    // Tint background subtly so the sky color responds too
-    return { color, altDeg, azDeg };
+    try { map.setLight({ anchor: 'map', color, intensity, position: [1.4, azDeg, polar] }); } catch (e) {}
+    return { altDeg, azDeg };
 }
 
-/* ============= UI: walk time, distance ============= */
+function updateSunRays(altDeg, azDeg, scored) {
+    const src = map.getSource('sun-rays');
+    if (!src) return;
+    if (!state.raysOn || altDeg < 0) { src.setData({ type: 'FeatureCollection', features: [] }); return; }
+    const dx = Math.sin(azDeg * Math.PI / 180), dy = Math.cos(azDeg * Math.PI / 180);
+    const reach = 0.0022;
+    const features = scored.filter(x => x.score >= 50).map(({ p, score }) => ({
+        type: 'Feature',
+        properties: { width: 1 + score / 60, opacity: 0.12 + score / 350 },
+        geometry: { type: 'LineString', coordinates: [[p.lng + dx * reach, p.lat + dy * reach], [p.lng, p.lat]] }
+    }));
+    src.setData({ type: 'FeatureCollection', features });
+}
+
+/* ============= HELPERS ============= */
 function distanceMeters(a, b) {
-    const R = 6371000;
-    const toRad = d => d * Math.PI / 180;
-    const dLat = toRad(b.lat - a.lat);
-    const dLng = toRad(b.lng - a.lng);
-    const lat1 = toRad(a.lat), lat2 = toRad(b.lat);
-    const x = Math.sin(dLat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLng/2)**2;
+    const R = 6371000, toRad = d => d * Math.PI / 180;
+    const dLat = toRad(b.lat - a.lat), dLng = toRad(b.lng - a.lng);
+    const x = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
     return 2 * R * Math.asin(Math.sqrt(x));
 }
-function walkMins(p) {
-    const m = distanceMeters(HOME, p);
-    return Math.max(1, Math.round(m / 80));   // ~80 m/min walking pace
+const walkMins = p => Math.max(1, Math.round(distanceMeters(HOME, p) / 80));
+
+function formatTime(d) {
+    if (!d || isNaN(d.getTime())) return '—';
+    let h = d.getHours(); const m = d.getMinutes();
+    const ap = h >= 12 ? 'PM' : 'AM';
+    h = ((h + 11) % 12) + 1;
+    return `${h}:${String(m).padStart(2, '0')} ${ap}`;
 }
 
-/* ============= POPUP ============= */
+const typeLabel = { rooftop: 'Rooftop', patio: 'Patio', garden: 'Garden', water: 'Waterfront' };
+
+/* ============= POPUP / SELECT ============= */
 let activePopup = null;
-function openPopup(p) {
-    if (activePopup) activePopup.remove();
+function selectPatio(p, fly = true) {
     state.activePatio = p.name;
+    if (fly) map.flyTo({ center: [p.lng, p.lat], zoom: 16, pitch: 55, duration: 1000 });
+    if (activePopup) activePopup.remove();
+
     const when = currentDateTime();
     const score = sunScore(p, when);
-    const sun = SunCalc.getPosition(when, p.lat, p.lng);
-    const altDeg = (sun.altitude * 180 / Math.PI).toFixed(1);
-    const azDeg = ((sun.azimuth * 180 / Math.PI + 180 + 360) % 360).toFixed(0);
-    const tagClass = p.type;
-    const html = `
-        <div class="popup-name">${p.name}</div>
-        <div class="popup-addr">${p.addr}</div>
-        <div class="popup-tags">
-            <span class="tag ${tagClass}" style="font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;padding:2px 6px;border-radius:4px;">${p.type}</span>
-            <span class="tag" style="font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,0.06);color:#8a8aa0;">${walkMins(p)} min walk</span>
-            ${p.floor ? `<span class="tag" style="font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,0.06);color:#8a8aa0;">Floor ${p.floor}</span>` : ''}
-        </div>
-        <div class="popup-stats">
-            <div class="popup-stat"><div class="l">Sun Score</div><div class="v sun">${score}</div></div>
-            <div class="popup-stat"><div class="l">Sun Alt</div><div class="v">${altDeg}°</div></div>
-            <div class="popup-stat"><div class="l">From Home</div><div class="v">${(distanceMeters(HOME, p)/1000).toFixed(2)} km</div></div>
-            <div class="popup-stat"><div class="l">Sun Az</div><div class="v">${azDeg}°</div></div>
-        </div>
-        <div class="popup-vibe">${p.vibe}</div>
-    `;
-    activePopup = new maplibregl.Popup({ offset: 18, closeButton: true, maxWidth: '300px' })
+    const w = sunWindows.get(p.name) || {};
+    const sunLine = w.closed
+        ? 'Closed for the season'
+        : (w.to ? `Sun today until <b>${formatTime(w.to)}</b>` : 'In shade today');
+    const gmaps = `https://maps.apple.com/?daddr=${p.lat},${p.lng}&dirflg=w`;
+
+    activePopup = new maplibregl.Popup({ offset: 20, closeButton: true, maxWidth: '310px' })
         .setLngLat([p.lng, p.lat])
-        .setHTML(html)
+        .setHTML(`
+            <div class="pp-head">
+                <div class="pp-name">${p.name}</div>
+                <div class="bubble" style="width:38px;height:38px;font-size:13px;background:${bubbleColor(score)}">${displayScore(score)}</div>
+            </div>
+            <div class="pp-addr">${p.addr} · ${p.hood}</div>
+            <div class="pp-row"><span class="type-pill ${p.type}">${typeLabel[p.type]}</span> Floor ${p.floor} · ${walkMins(p)} min walk</div>
+            <div class="pp-row"><span class="dot">☀</span> <span>${sunLine}</span></div>
+            <div class="pp-vibe">${p.vibe}</div>
+            <div class="pp-actions">
+                <a class="pp-btn" href="${gmaps}" target="_blank" rel="noopener">Directions</a>
+                <a class="pp-btn alt" href="https://www.google.com/search?q=${encodeURIComponent(p.name + ' NYC reservations')}" target="_blank" rel="noopener">Reserve</a>
+            </div>
+        `)
         .addTo(map);
+
+    renderList(lastScored);
+    const row = document.querySelector(`[data-name="${CSS.escape(p.name)}"]`);
+    if (row) row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    if (document.body.classList.contains('view-list') && window.innerWidth <= 900 && !fly) return;
+    if (window.innerWidth <= 900) setView('map');
 }
 
 /* ============= LIST ============= */
-function flashPatioInList(p) {
-    document.querySelectorAll('.patio').forEach(el => el.classList.remove('active'));
-    const row = document.querySelector(`[data-patio="${CSS.escape(p.name)}"]`);
-    if (row) {
-        row.classList.add('active');
-        row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-}
-
+let lastScored = [];
 function renderList(scored) {
-    const list = document.getElementById('patio-list');
-    const filter = state.filter;
-    const filtered = scored.filter(({ p }) => filter === 'all' || p.type === filter);
-    list.innerHTML = filtered.map(({ p, score }) => {
-        const C = 2 * Math.PI * 16;
-        const offset = C * (1 - score / 100);
+    const list = document.getElementById('list');
+    const q = state.query.trim().toLowerCase();
+    let rows = scored.filter(({ p }) =>
+        (state.filter === 'all' || p.type === state.filter) &&
+        (!q || p.name.toLowerCase().includes(q) || p.hood.toLowerCase().includes(q))
+    );
+    if (state.sort === 'walk') rows = [...rows].sort((a, b) => walkMins(a.p) - walkMins(b.p));
+
+    document.getElementById('count').textContent =
+        `${rows.length} spot${rows.length === 1 ? '' : 's'} · ranked at ${formatTime(currentDateTime())}`;
+
+    list.innerHTML = rows.map(({ p, score }, i) => {
+        const w = sunWindows.get(p.name) || {};
+        let sunLine, cls = '';
+        if (w.closed)      { sunLine = `Seasonal · opens May`; cls = 'closed'; }
+        else if (w.to)     { sunLine = `☀ Sun until ${formatTime(w.to)}`; }
+        else               { sunLine = `In shade today`; cls = 'shaded'; }
         return `
-        <div class="patio ${state.activePatio === p.name ? 'active' : ''}" data-patio="${p.name}">
-            <div class="score-ring">
-                <svg width="38" height="38" viewBox="0 0 38 38">
-                    <circle class="track" cx="19" cy="19" r="16" fill="none" stroke-width="3"/>
-                    <circle class="fill" cx="19" cy="19" r="16" fill="none" stroke-width="3"
-                            stroke-dasharray="${C}" stroke-dashoffset="${offset}"
-                            stroke-linecap="round" style="stroke:${scoreColor(score)};"/>
-                </svg>
-                <div class="num">${score}</div>
+        <div class="card ${i < 3 ? 'top3' : ''} ${state.activePatio === p.name ? 'active' : ''}" data-name="${p.name}">
+            <div class="rank">${i + 1}</div>
+            <div class="card-body">
+                <div class="card-name">${p.name}</div>
+                <div class="card-meta"><span class="type-pill ${p.type}">${typeLabel[p.type]}</span>${p.hood} · ${walkMins(p)} min walk</div>
+                <div class="card-sun ${cls}">${sunLine}</div>
             </div>
-            <div class="patio-info">
-                <div class="patio-name">${p.name}</div>
-                <div class="patio-meta">
-                    <span class="tag ${p.type}">${p.type}</span>
-                    <span class="walk-time">${walkMins(p)} min walk · ${(distanceMeters(HOME, p)/1000).toFixed(2)} km</span>
-                </div>
-                <div class="patio-vibe">${p.vibe}</div>
-            </div>
+            <div class="bubble" style="background:${bubbleColor(score)}">${displayScore(score)}</div>
         </div>`;
-    }).join('') || `<div style="padding:24px;text-align:center;color:var(--text-dim);font-size:12px;">No spots match that filter.</div>`;
-    list.querySelectorAll('.patio').forEach(el => {
+    }).join('') || `<div class="empty">No spots match. Try clearing filters.</div>`;
+
+    list.querySelectorAll('.card').forEach(el => {
         el.addEventListener('click', () => {
-            const name = el.dataset.patio;
-            const p = PATIOS.find(x => x.name === name);
-            if (!p) return;
-            map.flyTo({ center: [p.lng, p.lat], zoom: 16.5, pitch: 60, duration: 1100 });
-            openPopup(p);
-            flashPatioInList(p);
+            const p = PATIOS.find(x => x.name === el.dataset.name);
+            if (p) selectPatio(p, true);
         });
     });
 }
 
-/* ============= UPDATE LOOP ============= */
+/* ============= HERO ============= */
+function updateHero(times) {
+    /* Tonight's pick = best score at golden hour */
+    const gh = times.goldenHour;
+    if (isNaN(gh?.getTime())) return;
+    const best = PATIOS
+        .map(p => ({ p, score: sunScore(p, gh) }))
+        .sort((a, b) => b.score - a.score)[0];
+    document.getElementById('hero-pick').textContent = best.p.name;
+    document.getElementById('hero-sub').textContent =
+        `${displayScore(best.score)} at golden hour (${formatTime(gh)}) · ${best.p.hood} · ${walkMins(best.p)} min walk`;
+    document.getElementById('hero').onclick = () => {
+        state.minutes = gh.getHours() * 60 + gh.getMinutes();
+        document.getElementById('time-slider').value = state.minutes;
+        update();
+        selectPatio(best.p, true);
+    };
+}
+
+/* ============= UPDATE ============= */
 function update() {
     const when = currentDateTime();
-
-    // Sun light + 3D building shading
-    const lightInfo = applyMapLight(when);
-
-    // Background tint of the page (subtle)
-    const bgFor = lightInfo.altDeg;
-    if (bgFor > 6)         document.body.style.background = '#08080f';
-    else if (bgFor > -3)   document.body.style.background = '#0e0a14';
-    else                   document.body.style.background = '#04060f';
-
-    // Sunrise / sunset / golden hour
+    const { altDeg, azDeg } = applyMapLight(when);
     const times = SunCalc.getTimes(when, HOME.lat, HOME.lng);
+
     document.getElementById('rise-time').textContent = formatTime(times.sunrise);
-    document.getElementById('set-time').textContent  = formatTime(times.sunset);
-    document.getElementById('clock').textContent     = formatTime(when);
+    document.getElementById('set-time').textContent = formatTime(times.sunset);
+    document.getElementById('clock').textContent = formatTime(when);
+    document.getElementById('stat-sunset').textContent = formatTime(times.sunset);
+    document.getElementById('stat-golden').textContent = formatTime(times.goldenHour);
+    document.getElementById('stat-phase').textContent = phaseFor(altDeg, when, times);
 
-    // Phase pill
-    document.getElementById('sun-phase').textContent = phaseFor(lightInfo.altDeg, when, times);
-    document.getElementById('sun-pos').textContent = `alt ${lightInfo.altDeg.toFixed(1)}° · az ${Math.round(lightInfo.azDeg)}°`;
-    document.getElementById('sun-swatch').style.background = lightInfo.color;
-    document.getElementById('sun-swatch').style.boxShadow = `0 0 8px ${lightInfo.color}`;
+    const scored = PATIOS.map(p => ({ p, score: sunScore(p, when) })).sort((a, b) => b.score - a.score);
+    lastScored = scored;
 
-    // Score every patio
-    const scored = PATIOS.map(p => ({ p, score: sunScore(p, when) }))
-        .sort((a, b) => b.score - a.score);
-
-    // Update markers visually — only the inner dot changes; the wrapper (and
-    // therefore the lat/lng anchor) stays the same fixed size so markers never drift.
     scored.forEach(({ p, score }) => {
-        const m = markers.get(p.name);
-        if (!m || !m.dot) return;
-        m.dot.style.background = scoreGradient(score);
-        m.dot.style.boxShadow = scoreGlow(score);
-        m.dot.style.opacity = score < 12 ? 0.55 : 1;
-        const scale = score >= 80 ? 1.35 : score >= 50 ? 1.1 : score >= 20 ? 0.85 : 0.65;
-        m.dot.style.transform = `scale(${scale})`;
+        const pin = pins.get(p.name);
+        if (!pin) return;
+        pin.bubble.style.background = bubbleColor(score);
+        pin.bubble.textContent = displayScore(score);
+        pin.bubble.style.opacity = score < 20 && score >= 0 ? 0.75 : 1;
     });
 
-    // Sun ray overlays
-    updateSunRays({ altitude: lightInfo.altDeg * Math.PI / 180, azimuth: (lightInfo.azDeg - 180) * Math.PI / 180 }, scored);
-
-    // Slider markers (rise/set/golden positions)
-    placeSliderMarkers(times);
-
-    // Slider "now" indicator
-    const slider = document.getElementById('time-slider');
-    const pct = state.minutes / 1439;
-    document.getElementById('slider-now').style.left = (pct * slider.clientWidth) + 'px';
-
-    // List
+    updateSunRays(altDeg, azDeg, scored);
+    placeTicks(times);
     renderList(scored);
+    updateHero(times);
 }
 
 function phaseFor(altDeg, when, times) {
     const t = when.getTime();
-    if (altDeg < -6) return 'NIGHT';
-    if (altDeg < 0) {
-        if (t < times.sunrise.getTime()) return 'DAWN';
-        return 'DUSK';
-    }
-    if (altDeg < 6) {
-        return t < times.solarNoon.getTime() ? 'SUNRISE' : 'SUNSET';
-    }
-    if (altDeg < 14) return 'GOLDEN HOUR';
-    if (altDeg > 55) return 'MIDDAY';
-    return 'DAYLIGHT';
+    if (altDeg < -6) return '🌙 Night';
+    if (altDeg < 0) return t < times.sunrise.getTime() ? '🌅 Dawn' : '🌆 Dusk';
+    if (altDeg < 6) return t < times.solarNoon.getTime() ? '🌅 Sunrise' : '🌇 Sunset';
+    if (altDeg < 14) return '✨ Golden hour';
+    if (altDeg > 55) return '☀ Midday';
+    return '☀ Daylight';
 }
 
-function placeSliderMarkers(times) {
+function placeTicks(times) {
     const slider = document.getElementById('time-slider');
     const w = slider.clientWidth;
-    const place = (id, date) => {
-        const m = date.getHours() * 60 + date.getMinutes();
-        const x = (m / 1439) * w;
-        const el = document.getElementById(id);
-        if (el) el.style.left = x + 'px';
+    const put = (id, d) => {
+        if (!d || isNaN(d.getTime())) return;
+        const m = d.getHours() * 60 + d.getMinutes();
+        document.getElementById(id).style.left = (m / 1439) * w + 'px';
     };
-    if (!isNaN(times.sunrise.getTime())) place('marker-rise', times.sunrise);
-    if (!isNaN(times.sunset.getTime()))  place('marker-set', times.sunset);
-    if (!isNaN(times.solarNoon.getTime())) place('marker-noon', times.solarNoon);
-    if (!isNaN(times.goldenHourEnd.getTime())) place('marker-golden-am', times.goldenHourEnd);
-    if (!isNaN(times.goldenHour.getTime()))    place('marker-golden-pm', times.goldenHour);
+    put('tick-rise', times.sunrise);
+    put('tick-noon', times.solarNoon);
+    put('tick-golden', times.goldenHour);
+    put('tick-set', times.sunset);
 }
 
-function formatTime(d) {
-    if (!d || isNaN(d.getTime())) return '—';
-    let h = d.getHours();
-    const m = d.getMinutes();
-    const ap = h >= 12 ? 'PM' : 'AM';
-    h = ((h + 11) % 12) + 1;
-    return `${h}:${m.toString().padStart(2, '0')} ${ap}`;
-}
-
-function lighten(hex, pct) {
-    const c = hex.replace('#','');
-    const n = parseInt(c, 16);
-    let r = (n >> 16) & 0xff, g = (n >> 8) & 0xff, b = n & 0xff;
-    r = Math.min(255, r + Math.round(255 * pct / 100));
-    g = Math.min(255, g + Math.round(255 * pct / 100));
-    b = Math.min(255, b + Math.round(255 * pct / 100));
-    return '#' + ((r << 16) | (g << 8) | b).toString(16).padStart(6, '0');
-}
-
-/* ============= EVENT WIRING ============= */
-const slider = document.getElementById('time-slider');
-slider.addEventListener('input', e => {
-    state.minutes = parseInt(e.target.value, 10);
+/* ============= EVENTS ============= */
+document.getElementById('time-slider').addEventListener('input', e => {
+    state.minutes = +e.target.value;
     update();
 });
 
 document.getElementById('date-input').addEventListener('change', e => {
-    const v = e.target.value;
-    if (!v) return;
-    const [y, m, d] = v.split('-').map(Number);
-    state.date = new Date(y, m - 1, d, 0, 0, 0);
+    if (!e.target.value) return;
+    const [y, m, d] = e.target.value.split('-').map(Number);
+    state.date = new Date(y, m - 1, d);
+    computeSunWindows();
     update();
 });
 
-document.getElementById('golden-hour').addEventListener('click', () => {
+document.getElementById('golden-btn').addEventListener('click', () => {
     const times = SunCalc.getTimes(currentDateTime(), HOME.lat, HOME.lng);
     if (!isNaN(times.goldenHour.getTime())) {
-        const m = times.goldenHour.getHours() * 60 + times.goldenHour.getMinutes();
-        state.minutes = m;
-        slider.value = m;
+        state.minutes = times.goldenHour.getHours() * 60 + times.goldenHour.getMinutes();
+        document.getElementById('time-slider').value = state.minutes;
         update();
     }
 });
 
-document.getElementById('play').addEventListener('click', () => {
+document.getElementById('now-btn').addEventListener('click', () => {
+    const n = new Date();
+    state.minutes = n.getHours() * 60 + n.getMinutes();
+    document.getElementById('time-slider').value = state.minutes;
+    update();
+});
+
+document.getElementById('play-btn').addEventListener('click', () => {
     state.playing = !state.playing;
-    const btn = document.getElementById('play');
+    const btn = document.getElementById('play-btn');
     if (state.playing) {
         btn.textContent = '❚❚';
         state.playInterval = setInterval(() => {
             state.minutes = (state.minutes + 4) % 1440;
-            slider.value = state.minutes;
+            document.getElementById('time-slider').value = state.minutes;
             update();
         }, 90);
     } else {
@@ -1443,42 +1302,74 @@ document.getElementById('play').addEventListener('click', () => {
     }
 });
 
-document.getElementById('recenter').addEventListener('click', () => {
-    map.flyTo({ center: [HOME.lng, HOME.lat], zoom: 15.2, pitch: 62, bearing: -22, duration: 1200 });
-});
+document.getElementById('recenter').addEventListener('click', () =>
+    map.flyTo({ center: [HOME.lng, HOME.lat], zoom: 13.6, pitch: 52, bearing: -16, duration: 1100 }));
 
-document.getElementById('toggle-3d').addEventListener('click', () => {
-    const p = map.getPitch();
-    map.easeTo({ pitch: p > 10 ? 0 : 62, duration: 700 });
-});
+document.getElementById('toggle-3d').addEventListener('click', () =>
+    map.easeTo({ pitch: map.getPitch() > 10 ? 0 : 52, duration: 600 }));
 
-document.getElementById('toggle-rays').addEventListener('click', () => {
-    raysOn = !raysOn;
+document.getElementById('toggle-rays').addEventListener('click', e => {
+    state.raysOn = !state.raysOn;
+    e.currentTarget.classList.toggle('on', state.raysOn);
     update();
 });
 
-document.querySelectorAll('.chip').forEach(chip => {
+document.querySelectorAll('#filters .chip').forEach(chip => {
     chip.addEventListener('click', () => {
-        document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+        document.querySelectorAll('#filters .chip').forEach(c => c.classList.remove('active'));
         chip.classList.add('active');
         state.filter = chip.dataset.filter;
-        update();
+        renderList(lastScored);
     });
 });
 
-window.addEventListener('resize', () => update());
+document.querySelectorAll('.sort button').forEach(b => {
+    b.addEventListener('click', () => {
+        document.querySelectorAll('.sort button').forEach(x => x.classList.remove('active'));
+        b.classList.add('active');
+        state.sort = b.dataset.sort;
+        renderList(lastScored);
+    });
+});
 
-/* Initial date = today if in window, else May 15 */
-(function initDate() {
+document.getElementById('search').addEventListener('input', e => {
+    state.query = e.target.value;
+    renderList(lastScored);
+});
+
+/* Mobile view switch */
+function setView(v) {
+    document.body.classList.toggle('view-map', v === 'map');
+    document.body.classList.toggle('view-list', v === 'list');
+    document.getElementById('nav-map').classList.toggle('active', v === 'map');
+    document.getElementById('nav-list').classList.toggle('active', v === 'list');
+    if (v === 'map') setTimeout(() => map.resize(), 60);
+}
+document.getElementById('nav-map').addEventListener('click', () => setView('map'));
+document.getElementById('nav-list').addEventListener('click', () => setView('list'));
+
+window.addEventListener('resize', () => placeTicks(SunCalc.getTimes(currentDateTime(), HOME.lat, HOME.lng)));
+
+/* ============= INIT ============= */
+(function init() {
     const today = new Date();
-    const start = new Date('2026-05-01T00:00:00');
-    const end = new Date('2026-11-01T23:59:59');
-    let d;
-    if (today >= start && today <= end) d = today;
-    else d = new Date('2026-05-15T00:00:00');
+    const start = new Date(today.getFullYear(), 4, 1);        // May 1
+    const end = new Date(today.getFullYear(), 10, 1);         // Nov 1
+    let d = (today >= start && today <= end) ? today : new Date(today.getFullYear(), 4, 15);
     state.date = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-    document.getElementById('date-input').value =
-        `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+
+    const di = document.getElementById('date-input');
+    di.min = `${today.getFullYear()}-05-01`;
+    di.max = `${today.getFullYear()}-11-01`;
+    di.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+    /* Default to early evening; if it's evening right now, use the real time */
+    const nowMin = today.getHours() * 60 + today.getMinutes();
+    state.minutes = (nowMin >= 16 * 60 && nowMin <= 21 * 60) ? nowMin : 18 * 60;
+    document.getElementById('time-slider').value = state.minutes;
+
+    if (window.innerWidth <= 900) setView('list');
+    computeSunWindows();
 })();
 </script>
 </body>
