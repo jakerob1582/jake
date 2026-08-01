@@ -164,6 +164,7 @@
     font-size: 11.5px; color: var(--ink2);
   }
   .chip.warn { color: var(--owe); }
+  .chip[hidden] { display: none; }
 
   input[type="number"] {
     width: 108px; padding: 5px 8px; border-radius: 7px;
@@ -195,7 +196,7 @@
     padding: 5px 12px; font-size: 12.5px; font-weight: 600;
     font-family: inherit;
   }
-  .seg button[aria-checked="true"] { background: var(--accent); color: #fff; }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
 
   .switch {
     width: 38px; height: 22px; border-radius: 11px; border: 1px solid var(--line);
@@ -238,7 +239,7 @@
   .lg { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink2); }
   .lg i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
 
-  .chartwrap { position: relative; width: 100%; }
+  .chartwrap { position: relative; width: 100%; overflow-x: auto; }
   svg { display: block; }
   svg text {
     font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
@@ -390,9 +391,9 @@
           <input id="sl-k401" type="range" min="0" max="30" step="1" value="0" aria-label="401k percent slider">
           <div class="frow" style="margin-top:9px">
             <span style="font-size:12.5px;color:var(--ink2)">Type</span>
-            <div class="seg" role="radiogroup" aria-label="401k type">
-              <button id="seg-trad" role="radio" aria-checked="true">Traditional</button>
-              <button id="seg-roth" role="radio" aria-checked="false">Roth</button>
+            <div class="seg" role="group" aria-label="401k type">
+              <button id="seg-trad" aria-pressed="true">Traditional</button>
+              <button id="seg-roth" aria-pressed="false">Roth</button>
             </div>
           </div>
           <span class="chip" id="chip-k401" hidden></span>
@@ -558,10 +559,6 @@ function bracketTax(brs, ti) {
   }
   return tax;
 }
-function marginalRate(brs, ti) {
-  for (const [rate, cap] of brs) if (ti <= cap) return rate;
-  return brs[brs.length - 1][0];
-}
 const clamp01 = x => Math.max(0, Math.min(1, x));
 
 /* NY tax-benefit recapture (supplemental tax), single filer.
@@ -589,13 +586,23 @@ function nyRecapture(ti, agi) {
 }
 function nyTax(ti, agi) { return bracketTax(T.nyBrackets, ti) + nyRecapture(ti, agi); }
 
+/* FICA on a slice of wages, given cumulative FICA wages already paid this year. */
+function ficaOn(amount, cumBefore) {
+  const ssRoom = Math.max(0, T.ssCap - Math.min(cumBefore, T.ssCap));
+  const ss = T.ssRate * Math.min(amount, ssRoom);
+  const med = T.medRate * amount
+    + T.addlMedRate * (Math.max(0, cumBefore + amount - T.addlMedThresh) - Math.max(0, cumBefore - T.addlMedThresh));
+  return { ss, med };
+}
+
 /* Full-year scenario at actual (reconciled) tax. */
 function annual(inp) {
   const gross = inp.base + inp.bonus + inp.signon + inp.reloc;
   const k401 = Math.min(inp.base * inp.k401Pct, T.k401Limit);
   const trad = inp.kType === "trad" ? k401 : 0;
   const roth = inp.kType === "roth" ? k401 : 0;
-  const sec125 = inp.premiums + inp.hsa;               // FICA-exempt
+  // Section 125 deductions come out of base paychecks, so they can't exceed base
+  const sec125 = Math.min(inp.premiums + inp.hsa, inp.base);  // FICA-exempt
   const ficaW = Math.max(0, gross - sec125);           // 401(k) still FICA-taxed
   const ss = T.ssRate * Math.min(ficaW, T.ssCap);
   const med = T.medRate * ficaW + T.addlMedRate * Math.max(0, ficaW - T.addlMedThresh);
@@ -620,11 +627,7 @@ function suppCheck(amount, cumFicaBefore, cumSuppBefore) {
   const fed = T.fedSupp * at22 + T.fedSuppHi * (amount - at22);
   const ny = T.nySupp * amount;
   const nyc = T.nycSupp * amount;
-  const ssRoom = Math.max(0, T.ssCap - Math.min(cumFicaBefore, T.ssCap));
-  const ss = T.ssRate * Math.min(amount, ssRoom);
-  const overBefore = Math.max(0, cumFicaBefore - T.addlMedThresh);
-  const overAfter = Math.max(0, cumFicaBefore + amount - T.addlMedThresh);
-  const med = T.medRate * amount + T.addlMedRate * (overAfter - overBefore);
+  const { ss, med } = ficaOn(amount, cumFicaBefore);
   const total = fed + ny + nyc + ss + med;
   return { gross: amount, fed, ny, nyc, ss, med, total, net: amount - total, rate: total / amount };
 }
@@ -636,9 +639,13 @@ function compute(inp) {
   const other = annual({ ...inp, kType: inp.kType === "trad" ? "roth" : "trad" });
 
   // Payment order: sign-on (+ relocation) in month 1, base through the year, bonus last.
+  // FICA is decomposed in that order so the checks sum exactly to the annual figure
+  // (the sign-on consumes Social Security cap room before the base paychecks do).
   const oneTime = inp.signon + inp.reloc;
   const signonCk = suppCheck(oneTime, 0, 0);
-  const bonusCk = suppCheck(inp.bonus, Math.max(0, inp.base - inp.premiums - inp.hsa) + oneTime, oneTime);
+  const baseFicaW = Math.max(0, inp.base - full.sec125);
+  const baseFica = ficaOn(baseFicaW, oneTime);
+  const bonusCk = suppCheck(inp.bonus, oneTime + baseFicaW, oneTime);
 
   // Withheld across the year: base at ~annualized W-4, supplemental at flat rates, FICA exact.
   const wh = {
@@ -650,18 +657,24 @@ function compute(inp) {
   wh.total = wh.income + full.fica;
   const refund = wh.income - (full.fed + full.ny + full.nyc);
 
-  // Marginal combined rate on the next $1 of bonus.
-  const marg = marginalRate(T.fedBrackets, Math.max(1, full.fedTI))
-    + marginalRate(T.nyBrackets, Math.max(1, full.nyTI))
-    + marginalRate(T.nycBrackets, Math.max(1, full.nyTI))
-    + T.medRate
-    + (full.ficaW < T.ssCap ? T.ssRate : 0)
-    + (full.ficaW > T.addlMedThresh ? T.addlMedRate : 0);
+  // Marginal rate on the next bonus dollar, by finite difference on the whole
+  // stack — picks up the NY recapture phase-in slope, the SS cap state, and the
+  // standard deduction at low incomes, which plain bracket lookups all miss.
+  const dx = 100;
+  const bumped = annual({ ...inp, bonus: inp.bonus + dx });
+  const margParts = {
+    fed: (bumped.fed - full.fed) / dx,
+    ny: (bumped.ny - full.ny) / dx,
+    nyc: (bumped.nyc - full.nyc) / dx,
+    fica: (bumped.fica - full.fica) / dx
+  };
+  const marg = margParts.fed + margParts.ny + margParts.nyc + margParts.fica;
 
   const match = Math.min(inp.matchPct, 1) * inp.base;
-  const monthlyBase = baseOnly.net / 12;
+  const monthlyBase = (inp.base - full.sec125 - full.k401
+    - baseOnly.fed - baseOnly.ny - baseOnly.nyc - baseFica.ss - baseFica.med) / 12;
 
-  return { inp, full, baseOnly, other, signonCk, bonusCk, wh, refund, marg, match,
+  return { inp, full, baseOnly, other, signonCk, baseFica, bonusCk, wh, refund, marg, margParts, match,
            monthlyBase, rent: 0.30 * monthlyBase };
 }
 
@@ -676,7 +689,7 @@ const $k = x => {
   if (Math.abs(v) >= 1000) return "$" + Math.round(v / 1000) + "k";
   return "$" + v;
 };
-const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
 
 /* ================= input state ================= */
 const el = id => document.getElementById(id);
@@ -724,6 +737,8 @@ document.addEventListener("focusin", e => {
 });
 document.addEventListener("focusout", hideTip);
 document.addEventListener("scroll", hideTip, true);
+document.documentElement.addEventListener("mouseleave", hideTip);
+window.addEventListener("blur", hideTip);
 
 /* ================= chart helpers ================= */
 function niceCeil(v) {
@@ -820,8 +835,8 @@ function renderWaterfall() {
   const geo = steps.map((s, i) => {
     const cx = m.l + band * i + band / 2;
     let y0, y1;
-    if (s.total) { y0 = s.key === "gross" ? full.gross : full.net; y1 = 0; }
-    else { y0 = run; y1 = run - s.amt; }
+    if (s.total) { y0 = Math.max(0, s.key === "gross" ? full.gross : full.net); y1 = 0; }
+    else { y0 = run; y1 = Math.max(0, run - s.amt); }
     if (s.key === "gross") run = full.gross; else if (!s.total) run = y1;
     return { ...s, i, cx, top: Math.max(y0, y1), bot: Math.min(y0, y1), run };
   });
@@ -844,7 +859,10 @@ function renderWaterfall() {
     if (s.total) {
       labels += `<text class="dlab strong" x="${s.cx}" y="${yTop - 8}" text-anchor="middle">${$(s.amt)}</text>`;
     } else {
-      labels += `<text class="dlab" x="${s.cx}" y="${yTop + h + 15}" text-anchor="middle">−${$(s.amt)}</text>`;
+      // below the bar unless that would collide with the x-axis labels, then above
+      const below = yTop + h + 15;
+      const lY = below > y(0) - 4 ? yTop - 6 : below;
+      labels += `<text class="dlab" x="${s.cx}" y="${lY}" text-anchor="middle">−${$(s.amt)}</text>`;
     }
     const shortLab = band < 74 ? s.short : s.label.length > 12 ? s.short : s.label;
     labels += `<text class="ax" x="${s.cx}" y="${H - m.b + 18}" text-anchor="middle">${esc(shortLab)}</text>`;
@@ -950,7 +968,7 @@ function renderMonthly() {
 
   // rent affordability reference line: 30% of monthly base take-home
   const ry = y(R.rent);
-  const rent = `<line x1="${m.l}" x2="${W - m.r + 6}" y1="${ry}" y2="${ry}" stroke="var(--mut)" stroke-width="1"></line>
+  const rent = R.rent <= 0 ? "" : `<line x1="${m.l}" x2="${W - m.r + 6}" y1="${ry}" y2="${ry}" stroke="var(--mut)" stroke-width="1"></line>
     <text class="ax" x="${W - m.r + 10}" y="${ry - 4}" text-anchor="start">30% rent</text>
     <text class="ax" x="${W - m.r + 10}" y="${ry + 9}" text-anchor="start">${$(R.rent)}/mo</text>`;
 
@@ -984,7 +1002,7 @@ function renderPaycheckCards() {
   const dedMo = {
     k401: full.k401 / 12, prem: inp.premiums / 12, hsa: inp.hsa / 12,
     fed: baseOnly.fed / 12, ny: baseOnly.ny / 12, nyc: baseOnly.nyc / 12,
-    ss: baseOnly.ss / 12, med: baseOnly.med / 12
+    ss: R.baseFica.ss / 12, med: R.baseFica.med / 12
   };
   const netMo = R.monthlyBase;
 
@@ -1038,10 +1056,11 @@ function renderPaycheckCards() {
       { key: "fed", amt: signonCk.fed }, { key: "ny", amt: signonCk.ny },
       { key: "nyc", amt: signonCk.nyc }, { key: "fica", amt: signonCk.ss + signonCk.med }
     ];
+    const s1over = signonCk.gross > T.fedSuppHiThresh;
     html += `<div class="pcard">
       <div class="pk"><span>Month 1 · sign-on${inp.reloc > 0 ? " + relocation" : ""}</span><b class="num">${$(signonCk.gross)} gross</b></div>
       ${meterHTML(sParts, signonCk.gross)}
-      ${prow("Federal flat 22%", signonCk.fed, "fed")}
+      ${prow(`Federal flat ${s1over ? "22% / 37%" : "22%"}`, signonCk.fed, "fed")}
       ${prow("NY State flat 11.70%", signonCk.ny, "ny")}
       ${prow("NYC flat 4.25%", signonCk.nyc, "nyc")}
       ${prow("Social Security + Medicare", signonCk.ss + signonCk.med, "fica")}
@@ -1088,11 +1107,13 @@ function renderRecon() {
         <td class="num ${d > 0.5 ? "pos" : d < -0.5 ? "neg" : ""}">${Math.abs(d) < 0.5 ? "—" : $signed(d)}</td></tr>`;
     }).join("")}</tbody></table>`;
 
+  const mp = R.margParts;
   el("recon-note").innerHTML =
     `<b>Why the bonus check looks over-taxed:</b> supplemental pay is withheld flat — 22% federal `
     + `(37% only on supplemental wages past $1,000,000), 11.70% NY State, 4.25% NYC — regardless of your bracket. `
     + `Your actual marginal rate on the next bonus dollar right now is <b class="num">${pct(marg)}</b> `
-    + `(federal + state + city + Medicare${full.ficaW < T.ssCap ? " + Social Security" : ""}). `
+    + `(<span class="num">${pct(mp.fed, 2)}</span> federal + <span class="num">${pct(mp.ny, 2)}</span> NY State incl. recapture `
+    + `+ <span class="num">${pct(mp.nyc, 2)}</span> NYC + <span class="num">${pct(mp.fica, 2)}</span> FICA). `
     + `Flat withholding above or below that is what creates the refund or balance due when you file.`;
 }
 
@@ -1100,7 +1121,7 @@ function renderFineprint() {
   const { inp, full } = R;
   const items = [
     "2026 rules, single filer, full-year NYC resident, standard deduction (federal $16,100; NY $8,000). No other income, credits, or itemizing.",
-    "Federal brackets per IRS Rev. Proc. 2025-32. NY State uses the 2026 rates from the enacted FY2026 budget (bottom five brackets each cut 0.1 point — top of the middle band is now 5.9%), including the tax-benefit recapture above $107,650 of NY AGI, which makes NY effectively a flat 5.9% of taxable income at analyst comp. Most calculators skip the recapture; it's worth a few hundred dollars here.",
+    "Federal brackets per IRS Rev. Proc. 2025-32. NY State uses the 2026 rates from the enacted FY2026 budget (bottom five brackets each cut 0.1 point — top of the middle band is now 5.9%), including the tax-benefit recapture above $107,650 of NY AGI, which makes NY effectively a flat 5.9% of taxable income up to ~$215k of taxable income (stepping toward 6.85% above that). Most calculators skip the recapture; it's worth a few hundred dollars here.",
     "FICA 2026: Social Security 6.2% on the first $184,500 of wages; Medicare 1.45% plus 0.9% surtax on wages above $200,000. 401(k) contributions are still FICA-taxed; Section 125 items (health premiums, HSA/FSA via payroll) are not.",
     "Bonus, sign-on, and relocation are modeled as supplemental wages: withheld at flat rates at payout, then taxed as ordinary income at filing. Order assumed: sign-on/relocation in month 1, bonus last.",
     "Base-paycheck withholding is approximated by annualizing (standard W-4, no adjustments) — real paychecks will differ by small amounts.",
@@ -1155,6 +1176,11 @@ function bindPair(numId, slId, key, scale) {
     const v = Math.max(0, +num.value || 0);
     sl.value = v; paintRange(sl); put(v);
   });
+  // on commit (blur/Enter), reflect the clamped value the model actually used
+  num.addEventListener("change", () => {
+    num.value = String(Math.round(state[key] / (scale || 1) * 100) / 100);
+    sl.value = num.value; paintRange(sl);
+  });
   sl.addEventListener("input", () => {
     num.value = sl.value; paintRange(sl); put(+sl.value);
   });
@@ -1168,10 +1194,12 @@ bindPair("in-match", "sl-match", "matchPct", 0.01);
 bindPair("in-prem", "sl-prem", "premMo");
 
 el("in-reloc").addEventListener("input", () => { state.reloc = Math.max(0, +el("in-reloc").value || 0); renderAll(); });
+el("in-reloc").addEventListener("change", () => { el("in-reloc").value = String(state.reloc); });
 el("in-hsa").addEventListener("input", () => {
-  state.hsa = Math.max(0, +el("in-hsa").value || 0);
+  state.hsa = Math.min(Math.max(0, +el("in-hsa").value || 0), T.hsaLimit);
   renderAll();
 });
+el("in-hsa").addEventListener("change", () => { el("in-hsa").value = String(state.hsa); });
 
 function bindSwitch(swId, bodyId, key) {
   const sw = el(swId), body = el(bodyId);
@@ -1189,15 +1217,24 @@ el("seg-trad").addEventListener("click", () => setKType("trad"));
 el("seg-roth").addEventListener("click", () => setKType("roth"));
 function setKType(t) {
   state.kType = t;
-  el("seg-trad").setAttribute("aria-checked", String(t === "trad"));
-  el("seg-roth").setAttribute("aria-checked", String(t === "roth"));
+  el("seg-trad").setAttribute("aria-pressed", String(t === "trad"));
+  el("seg-roth").setAttribute("aria-pressed", String(t === "roth"));
   renderAll();
 }
 
 let raf = 0;
 const ro = new ResizeObserver(() => {
   cancelAnimationFrame(raf);
-  raf = requestAnimationFrame(() => { if (R) { renderWaterfall(); renderMonthly(); } });
+  raf = requestAnimationFrame(() => {
+    if (!R) return;
+    const focused = document.activeElement && document.activeElement.getAttribute
+      ? document.activeElement.getAttribute("data-tipkey") : null;
+    renderWaterfall(); renderMonthly();
+    if (focused) {
+      const again = document.querySelector(`[data-tipkey="${focused}"]`);
+      if (again) again.focus();
+    }
+  });
 });
 ro.observe(el("wf-wrap"));
 ro.observe(el("mo-wrap"));
