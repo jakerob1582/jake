@@ -1,0 +1,1206 @@
+<title>NYC IB Analyst Take-Home Calculator</title>
+<style>
+  /* ---------- tokens: dark is the committed default ---------- */
+  :root {
+    color-scheme: dark;
+    --page: #0e1013;
+    --card: #17181b;
+    --well: #1d1f24;
+    --ink: #f2f3f5;
+    --ink2: #b9bec6;
+    --mut: #868c95;
+    --line: rgba(255, 255, 255, 0.08);
+    --grid: #26282d;
+    --baseline: #3a3d43;
+    --accent: #3987e5;
+    --accent-ink: #eaf2fd;
+    --good: #0ca30c;
+    --owe: #e66767;
+    --c-fed: #3987e5;
+    --c-ny: #d95926;
+    --c-nyc: #199e70;
+    --c-fica: #c98500;
+    --c-ded: #d55181;
+    --c-base: #008300;
+    --c-bonus: #9085e9;
+    --c-sign: #e66767;
+    --shadow: 0 1px 0 rgba(255,255,255,0.03) inset;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:where(:not([data-theme="dark"])) {
+      color-scheme: light;
+      --page: #f6f7f5;
+      --card: #fcfcfb;
+      --well: #f0f0ed;
+      --ink: #131417;
+      --ink2: #54585f;
+      --mut: #84888f;
+      --line: rgba(11, 11, 11, 0.10);
+      --grid: #e1e0d9;
+      --baseline: #c3c2b7;
+      --accent: #2a78d6;
+      --accent-ink: #123a68;
+      --good: #006300;
+      --owe: #d03b3b;
+      --c-fed: #2a78d6;
+      --c-ny: #eb6834;
+      --c-nyc: #1baf7a;
+      --c-fica: #eda100;
+      --c-ded: #e87ba4;
+      --c-base: #008300;
+      --c-bonus: #4a3aa7;
+      --c-sign: #e34948;
+      --shadow: none;
+    }
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --page: #f6f7f5;
+    --card: #fcfcfb;
+    --well: #f0f0ed;
+    --ink: #131417;
+    --ink2: #54585f;
+    --mut: #84888f;
+    --line: rgba(11, 11, 11, 0.10);
+    --grid: #e1e0d9;
+    --baseline: #c3c2b7;
+    --accent: #2a78d6;
+    --accent-ink: #123a68;
+    --good: #006300;
+    --owe: #d03b3b;
+    --c-fed: #2a78d6;
+    --c-ny: #eb6834;
+    --c-nyc: #1baf7a;
+    --c-fica: #eda100;
+    --c-ded: #e87ba4;
+    --c-base: #008300;
+    --c-bonus: #4a3aa7;
+    --c-sign: #e34948;
+    --shadow: none;
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0e1013;
+    --card: #17181b;
+    --well: #1d1f24;
+    --ink: #f2f3f5;
+    --ink2: #b9bec6;
+    --mut: #868c95;
+    --line: rgba(255, 255, 255, 0.08);
+    --grid: #26282d;
+    --baseline: #3a3d43;
+    --accent: #3987e5;
+    --accent-ink: #eaf2fd;
+    --good: #0ca30c;
+    --owe: #e66767;
+    --c-fed: #3987e5;
+    --c-ny: #d95926;
+    --c-nyc: #199e70;
+    --c-fica: #c98500;
+    --c-ded: #d55181;
+    --c-base: #008300;
+    --c-bonus: #9085e9;
+    --c-sign: #e66767;
+    --shadow: 0 1px 0 rgba(255,255,255,0.03) inset;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--page);
+    color: var(--ink);
+    font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono, .num {
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- shell ---------- */
+  .shell { max-width: 1200px; margin: 0 auto; padding: 20px 20px 56px; }
+  header.top {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px;
+    padding: 6px 2px 18px;
+  }
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+    font-size: 11px; letter-spacing: 0.14em; color: var(--mut); text-transform: uppercase;
+  }
+  header.top h1 {
+    font-size: 21px; font-weight: 650; margin: 0; letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+  header.top .sub { color: var(--ink2); font-size: 13.5px; }
+
+  .app { display: grid; grid-template-columns: 332px minmax(0, 1fr); gap: 18px; align-items: start; }
+  @media (max-width: 980px) { .app { grid-template-columns: 1fr; } .rail { position: static !important; } }
+
+  /* ---------- input rail ---------- */
+  .rail {
+    position: sticky; top: 14px;
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .group {
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 14px 16px 16px; box-shadow: var(--shadow);
+  }
+  .group h2 {
+    margin: 0 0 10px;
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--mut); font-weight: 600;
+  }
+  .field { padding: 9px 0 10px; border-top: 1px solid var(--line); }
+  .field:first-of-type { border-top: none; padding-top: 2px; }
+  .frow { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .frow label { font-size: 13.5px; color: var(--ink); font-weight: 500; }
+  .hint { font-size: 12px; color: var(--mut); margin-top: 4px; line-height: 1.45; }
+  .hint strong { color: var(--ink2); font-weight: 600; }
+  .chip {
+    display: inline-block; margin-top: 6px; padding: 2px 8px; border-radius: 6px;
+    background: var(--well); border: 1px solid var(--line);
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+    font-size: 11.5px; color: var(--ink2);
+  }
+  .chip.warn { color: var(--owe); }
+
+  input[type="number"] {
+    width: 108px; padding: 5px 8px; border-radius: 7px;
+    border: 1px solid var(--line); background: var(--well); color: var(--ink);
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+    font-size: 13px; text-align: right;
+  }
+  input[type="number"]:focus-visible, button:focus-visible, input[type="range"]:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+  input[type="range"] {
+    width: 100%; margin: 10px 0 0; appearance: none; height: 4px; border-radius: 2px;
+    background: linear-gradient(to right, var(--accent) 0 var(--fill, 50%), var(--baseline) var(--fill, 50%) 100%);
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    appearance: none; width: 16px; height: 16px; border-radius: 50%;
+    background: var(--accent); border: 3px solid var(--card); box-shadow: 0 0 0 1px var(--line);
+    cursor: pointer;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--accent); border: 3px solid var(--card); box-shadow: 0 0 0 1px var(--line);
+    cursor: pointer;
+  }
+
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--well); }
+  .seg button {
+    border: 0; background: transparent; color: var(--ink2); cursor: pointer;
+    padding: 5px 12px; font-size: 12.5px; font-weight: 600;
+    font-family: inherit;
+  }
+  .seg button[aria-checked="true"] { background: var(--accent); color: #fff; }
+
+  .switch {
+    width: 38px; height: 22px; border-radius: 11px; border: 1px solid var(--line);
+    background: var(--baseline); position: relative; cursor: pointer; padding: 0; flex: none;
+  }
+  .switch::after {
+    content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+    border-radius: 50%; background: var(--card); transition: left 0.15s ease;
+  }
+  .switch[aria-checked="true"] { background: var(--accent); border-color: var(--accent); }
+  .switch[aria-checked="true"]::after { left: 18px; }
+
+  /* ---------- canvas ---------- */
+  .canvas { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  @media (max-width: 1120px) { .tiles { grid-template-columns: repeat(2, 1fr); } }
+  .tile {
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 13px 15px 12px; box-shadow: var(--shadow); min-width: 0;
+  }
+  .tile .tl { font-size: 12px; color: var(--mut); }
+  .tile .tv {
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+    font-size: clamp(21px, 2.1vw, 26px); font-weight: 600; letter-spacing: -0.02em;
+    color: var(--ink); margin-top: 2px; white-space: nowrap;
+  }
+  .tile .ts { font-size: 12px; color: var(--mut); margin-top: 3px; line-height: 1.4; }
+  .tile .ts b { color: var(--ink2); font-weight: 600; }
+  .tile.hero .tv { color: var(--accent); }
+
+  .panel {
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 16px 18px 18px; box-shadow: var(--shadow); min-width: 0;
+  }
+  .panel h2 { margin: 0; font-size: 15.5px; font-weight: 650; letter-spacing: -0.005em; }
+  .panel .pdesc { margin: 3px 0 0; font-size: 13px; color: var(--mut); max-width: 68ch; }
+  .phead { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; margin-bottom: 8px; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 5px 14px; margin-top: 8px; }
+  .lg { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink2); }
+  .lg i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+
+  .chartwrap { position: relative; width: 100%; }
+  svg { display: block; }
+  svg text {
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+  .ax { fill: var(--mut); font-size: 10.5px; }
+  .dlab { fill: var(--ink2); font-size: 11px; font-weight: 500; }
+  .dlab.strong { fill: var(--ink); font-weight: 600; }
+  .gline { stroke: var(--grid); stroke-width: 1; }
+  .bline { stroke: var(--baseline); stroke-width: 1; }
+  .hit { fill: transparent; cursor: default; }
+  .hit:focus-visible { outline: none; stroke: var(--accent); stroke-width: 2; }
+
+  /* paycheck cards */
+  .pcards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 16px; }
+  @media (max-width: 900px) { .pcards { grid-template-columns: 1fr; } }
+  .pcard { background: var(--well); border: 1px solid var(--line); border-radius: 9px; padding: 12px 14px 13px; min-width: 0; }
+  .pcard .pk { font-size: 12px; color: var(--mut); display: flex; justify-content: space-between; gap: 8px; }
+  .pcard .pk b { color: var(--ink2); font-weight: 600; }
+  .meter { display: flex; gap: 2px; height: 8px; border-radius: 4px; overflow: hidden; margin: 9px 0 10px; background: var(--baseline); }
+  .meter i { height: 100%; }
+  .prow { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink2); padding: 2.5px 0; }
+  .prow .nm { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
+  .prow .nm i { width: 8px; height: 8px; border-radius: 2.5px; flex: none; }
+  .prow .num { color: var(--ink2); font-size: 12px; }
+  .pnet { display: flex; justify-content: space-between; align-items: baseline; border-top: 1px solid var(--line); margin-top: 8px; padding-top: 8px; }
+  .pnet .nm { font-size: 12.5px; color: var(--ink); font-weight: 600; }
+  .pnet .num { font-size: 17px; font-weight: 650; color: var(--ink); }
+  .pfoot { font-size: 11.5px; color: var(--mut); margin-top: 7px; line-height: 1.45; }
+
+  /* reconciliation */
+  .recon-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 12px; }
+  @media (max-width: 900px) { .recon-tiles { grid-template-columns: 1fr; } }
+  .rtile { background: var(--well); border: 1px solid var(--line); border-radius: 9px; padding: 11px 14px 12px; }
+  .rtile .tl { font-size: 12px; color: var(--mut); }
+  .rtile .tv { font-size: 21px; font-weight: 650; margin-top: 2px; }
+  .rtile .ts { font-size: 12px; color: var(--mut); margin-top: 2px; }
+  .rtile .tv.refund { color: var(--good); }
+  .rtile .tv.owed { color: var(--owe); }
+
+  table.grid { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12.5px; }
+  table.grid th {
+    text-align: right; font-weight: 600; color: var(--mut); font-size: 11px;
+    letter-spacing: 0.08em; text-transform: uppercase; padding: 6px 8px; border-bottom: 1px solid var(--line);
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  }
+  table.grid th:first-child, table.grid td:first-child { text-align: left; }
+  table.grid td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: right; color: var(--ink2); }
+  table.grid td:first-child { color: var(--ink); }
+  table.grid tr:last-child td { border-bottom: none; }
+  td.pos { color: var(--good) !important; } td.neg { color: var(--owe) !important; }
+  .swd { display: inline-block; width: 8px; height: 8px; border-radius: 2.5px; margin-right: 7px; vertical-align: baseline; }
+
+  details.tbl { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+  details.tbl summary { cursor: pointer; font-size: 13px; color: var(--ink2); font-weight: 550; }
+  details.tbl summary:hover { color: var(--ink); }
+
+  .note {
+    margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: var(--well);
+    border: 1px solid var(--line); font-size: 12.5px; color: var(--ink2); line-height: 1.55; max-width: none;
+  }
+  .note b { color: var(--ink); }
+
+  .fine { font-size: 12.5px; color: var(--mut); }
+  .fine h2 { font-size: 13px; color: var(--ink2); }
+  .fine ul { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 4px; }
+  .fine li { line-height: 1.5; }
+
+  /* tooltip */
+  #tip {
+    position: fixed; z-index: 40; pointer-events: none; display: none;
+    background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.35);
+    padding: 8px 11px; font-size: 12px; color: var(--ink2); min-width: 150px; max-width: 260px;
+  }
+  #tip .th { color: var(--ink); font-weight: 600; margin-bottom: 4px; font-size: 12.5px; }
+  #tip .tr { display: flex; justify-content: space-between; gap: 14px; padding: 1px 0; }
+  #tip .tr .num { color: var(--ink); }
+  #tip .tr i { display: inline-block; width: 8px; height: 8px; border-radius: 2.5px; margin-right: 6px; }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="shell">
+  <header class="top">
+    <div>
+      <div class="eyebrow">Tax year 2026 · Single filer · NYC resident</div>
+      <h1>First-year IB analyst — take-home pay, NYC</h1>
+    </div>
+    <div class="sub">Move any lever on the left; every figure recomputes instantly.</div>
+  </header>
+
+  <div class="app">
+    <!-- ============ INPUT RAIL ============ -->
+    <aside class="rail" aria-label="Calculator inputs">
+
+      <div class="group">
+        <h2>Compensation</h2>
+
+        <div class="field">
+          <div class="frow">
+            <label for="in-base">Base salary</label>
+            <input id="in-base" type="number" min="0" max="2000000" step="1000" value="110000" aria-label="Base salary in dollars">
+          </div>
+          <input id="sl-base" type="range" min="60000" max="250000" step="5000" value="110000" aria-label="Base salary slider">
+        </div>
+
+        <div class="field">
+          <div class="frow">
+            <label for="in-bonuspct">Year-end bonus <span class="mono" style="color:var(--mut);font-size:11px">% of base</span></label>
+            <input id="in-bonuspct" type="number" min="0" max="1000" step="5" value="70" aria-label="Bonus as percent of base">
+          </div>
+          <input id="sl-bonuspct" type="range" min="0" max="150" step="5" value="70" aria-label="Bonus percent slider">
+          <span class="chip" id="chip-bonus">= $77,000</span>
+        </div>
+
+        <div class="field">
+          <div class="frow">
+            <label for="in-signon">Sign-on bonus</label>
+            <input id="in-signon" type="number" min="0" max="500000" step="500" value="10000" aria-label="Sign-on bonus in dollars">
+          </div>
+          <input id="sl-signon" type="range" min="0" max="50000" step="1000" value="10000" aria-label="Sign-on bonus slider">
+          <div class="hint">One-time; typically lands with your <strong>first paycheck (month 1)</strong>, withheld as supplemental wages.</div>
+        </div>
+
+        <div class="field">
+          <div class="frow">
+            <label for="sw-reloc">Relocation bonus</label>
+            <button id="sw-reloc" class="switch" role="switch" aria-checked="false" aria-label="Toggle relocation bonus"></button>
+          </div>
+          <div id="reloc-body" hidden>
+            <div class="frow" style="margin-top:8px">
+              <label for="in-reloc" style="font-size:12.5px;color:var(--ink2)">Amount</label>
+              <input id="in-reloc" type="number" min="0" max="100000" step="500" value="5000" aria-label="Relocation bonus in dollars">
+            </div>
+          </div>
+          <div class="hint">Some firms pay this separately from sign-on; same tax treatment if paid as cash.</div>
+        </div>
+      </div>
+
+      <div class="group">
+        <h2>Pre-tax &amp; savings</h2>
+
+        <div class="field">
+          <div class="frow">
+            <label for="in-k401">401(k) contribution <span class="mono" style="color:var(--mut);font-size:11px">% of base</span></label>
+            <input id="in-k401" type="number" min="0" max="100" step="1" value="0" aria-label="401k contribution percent of base">
+          </div>
+          <input id="sl-k401" type="range" min="0" max="30" step="1" value="0" aria-label="401k percent slider">
+          <div class="frow" style="margin-top:9px">
+            <span style="font-size:12.5px;color:var(--ink2)">Type</span>
+            <div class="seg" role="radiogroup" aria-label="401k type">
+              <button id="seg-trad" role="radio" aria-checked="true">Traditional</button>
+              <button id="seg-roth" role="radio" aria-checked="false">Roth</button>
+            </div>
+          </div>
+          <span class="chip" id="chip-k401" hidden></span>
+          <div class="hint" id="hint-k401">Traditional lowers taxable income now; Roth taxes you now, withdrawals tax-free later. Neither escapes FICA.</div>
+        </div>
+
+        <div class="field">
+          <div class="frow">
+            <label for="in-match">Employer match <span class="mono" style="color:var(--mut);font-size:11px">% of base</span></label>
+            <input id="in-match" type="number" min="0" max="15" step="0.5" value="0" aria-label="Employer 401k match percent">
+          </div>
+          <input id="sl-match" type="range" min="0" max="8" step="0.5" value="0" aria-label="Employer match slider">
+          <div class="hint">Default 0% — many banks don't match for analysts, or match small. Match money goes to the 401(k), not take-home.</div>
+          <span class="chip" id="chip-match" hidden></span>
+        </div>
+
+        <div class="field">
+          <div class="frow">
+            <label for="sw-hsa">HSA / FSA contribution</label>
+            <button id="sw-hsa" class="switch" role="switch" aria-checked="false" aria-label="Toggle HSA or FSA contribution"></button>
+          </div>
+          <div id="hsa-body" hidden>
+            <div class="frow" style="margin-top:8px">
+              <label for="in-hsa" style="font-size:12.5px;color:var(--ink2)">Annual amount</label>
+              <input id="in-hsa" type="number" min="0" max="4400" step="100" value="4400" aria-label="HSA annual contribution">
+            </div>
+          </div>
+          <div class="hint">2026 HSA self-only limit: <strong>$4,400</strong> (needs an HDHP). Payroll HSA/FSA money also skips FICA. Healthcare FSA limit is $3,400 and works the same for paycheck math.</div>
+        </div>
+
+        <div class="field">
+          <div class="frow">
+            <label for="in-prem">Health insurance premium <span class="mono" style="color:var(--mut);font-size:11px">/mo</span></label>
+            <input id="in-prem" type="number" min="0" max="2000" step="25" value="100" aria-label="Monthly health insurance premium">
+          </div>
+          <input id="sl-prem" type="range" min="0" max="800" step="25" value="100" aria-label="Premium slider">
+          <div class="hint">Employee share, pre-tax (Section 125). Bank plans for single coverage typically run $50–$250/mo.</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ============ RESULTS CANVAS ============ -->
+    <main class="canvas">
+
+      <section class="tiles" aria-label="Summary">
+        <div class="tile">
+          <div class="tl">Total gross</div>
+          <div class="tv num" id="t-gross">—</div>
+          <div class="ts" id="t-gross-sub">—</div>
+        </div>
+        <div class="tile">
+          <div class="tl">Total take-home</div>
+          <div class="tv num" id="t-net">—</div>
+          <div class="ts" id="t-net-sub">—</div>
+        </div>
+        <div class="tile">
+          <div class="tl">Effective tax rate</div>
+          <div class="tv num" id="t-eff">—</div>
+          <div class="ts" id="t-eff-sub">full-year, incl. FICA</div>
+        </div>
+        <div class="tile hero">
+          <div class="tl">Monthly take-home · base only</div>
+          <div class="tv num" id="t-monthly">—</div>
+          <div class="ts" id="t-rent">—</div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="phead">
+          <div>
+            <h2>Where the year's gross goes</h2>
+            <p class="pdesc">Annual waterfall at actual full-year tax (after reconciliation), not paycheck withholding.</p>
+          </div>
+        </div>
+        <div class="chartwrap" id="wf-wrap"></div>
+        <div class="legend" id="wf-legend"></div>
+        <details class="tbl">
+          <summary>See the full breakdown as a table</summary>
+          <div id="wf-table"></div>
+        </details>
+      </section>
+
+      <section class="panel">
+        <div class="phead">
+          <div>
+            <h2>Monthly cash flow</h2>
+            <p class="pdesc">Base paychecks land evenly; the sign-on hits month 1 and the bonus hits month 12 — budget rent off the flat months, not the spikes.</p>
+          </div>
+        </div>
+        <div class="chartwrap" id="mo-wrap"></div>
+        <div class="legend" id="mo-legend"></div>
+        <div class="pcards" id="pcards"></div>
+      </section>
+
+      <section class="panel">
+        <div class="phead">
+          <div>
+            <h2>Withholding at payout vs. what you actually owe</h2>
+            <p class="pdesc">Bonus checks are withheld at flat statutory rates — that's a withholding rate, not your real tax. The full year reconciles at your actual brackets when you file.</p>
+          </div>
+        </div>
+        <div class="recon-tiles" id="recon-tiles"></div>
+        <div id="recon-table"></div>
+        <div class="note" id="recon-note"></div>
+      </section>
+
+      <section class="panel fine">
+        <h2>Assumptions &amp; fine print</h2>
+        <ul id="fineprint"></ul>
+      </section>
+    </main>
+  </div>
+</div>
+
+<div id="tip" role="presentation"></div>
+
+<script>
+"use strict";
+
+/* ================= 2026 TAX PARAMETERS (single filer) ================= */
+const T = {
+  // Federal — IRS Rev. Proc. 2025-32 (2026 inflation adjustments)
+  fedBrackets: [
+    [0.10, 12400], [0.12, 50400], [0.22, 105700], [0.24, 201775],
+    [0.32, 256225], [0.35, 640600], [0.37, Infinity]
+  ],
+  fedStd: 16100,
+
+  // FICA 2026
+  ssRate: 0.062, ssCap: 184500,
+  medRate: 0.0145, addlMedRate: 0.009, addlMedThresh: 200000,
+
+  // Limits 2026
+  k401Limit: 24500, hsaLimit: 4400,
+
+  // New York State — single, TY2026 (FY2026 budget cut the bottom five rates 0.1pt)
+  nyBrackets: [
+    [0.039, 8500], [0.044, 11700], [0.0515, 13900], [0.054, 80650],
+    [0.059, 215400], [0.0685, 1077550], [0.0965, 5000000],
+    [0.103, 25000000], [0.109, Infinity]
+  ],
+  nyStd: 8000,
+  nyRecapStart: 107650, nyRecapWindow: 50000, nyRecapFirstLower: 80650,
+
+  // New York City resident — single
+  nycBrackets: [
+    [0.03078, 12000], [0.03762, 25000], [0.03819, 50000], [0.03876, Infinity]
+  ],
+
+  // Supplemental (bonus) withholding rates
+  fedSupp: 0.22, fedSuppHi: 0.37, fedSuppHiThresh: 1000000,
+  nySupp: 0.117, nycSupp: 0.0425
+};
+
+/* ================= pure tax math ================= */
+function bracketTax(brs, ti) {
+  if (ti <= 0) return 0;
+  let tax = 0, lower = 0;
+  for (const [rate, cap] of brs) {
+    if (ti <= lower) break;
+    tax += rate * (Math.min(ti, cap) - lower);
+    lower = cap;
+  }
+  return tax;
+}
+function marginalRate(brs, ti) {
+  for (const [rate, cap] of brs) if (ti <= cap) return rate;
+  return brs[brs.length - 1][0];
+}
+const clamp01 = x => Math.max(0, Math.min(1, x));
+
+/* NY tax-benefit recapture (supplemental tax), single filer.
+   Above NY AGI $107,650 the benefit of the lower brackets phases out over
+   $50,000 windows, effectively flattening tax toward the marginal rate. */
+function nyRecapture(ti, agi) {
+  if (agi <= T.nyRecapStart) return 0;
+  let rec = 0, lower = 0, prevRate = 0;
+  for (const [rate, cap] of T.nyBrackets) {
+    if (lower >= T.nyRecapFirstLower && ti > lower) {
+      let C, phaseStart;
+      if (lower === T.nyRecapFirstLower) {
+        C = rate * lower - bracketTax(T.nyBrackets, lower);
+        phaseStart = T.nyRecapStart;
+      } else {
+        C = (rate - prevRate) * lower;
+        phaseStart = lower;
+      }
+      rec += clamp01((agi - phaseStart) / T.nyRecapWindow) * C;
+    }
+    prevRate = rate; lower = cap;
+    if (!isFinite(cap)) break;
+  }
+  return rec;
+}
+function nyTax(ti, agi) { return bracketTax(T.nyBrackets, ti) + nyRecapture(ti, agi); }
+
+/* Full-year scenario at actual (reconciled) tax. */
+function annual(inp) {
+  const gross = inp.base + inp.bonus + inp.signon + inp.reloc;
+  const k401 = Math.min(inp.base * inp.k401Pct, T.k401Limit);
+  const trad = inp.kType === "trad" ? k401 : 0;
+  const roth = inp.kType === "roth" ? k401 : 0;
+  const sec125 = inp.premiums + inp.hsa;               // FICA-exempt
+  const ficaW = Math.max(0, gross - sec125);           // 401(k) still FICA-taxed
+  const ss = T.ssRate * Math.min(ficaW, T.ssCap);
+  const med = T.medRate * ficaW + T.addlMedRate * Math.max(0, ficaW - T.addlMedThresh);
+  const fedTI = Math.max(0, gross - sec125 - trad - T.fedStd);
+  const fed = bracketTax(T.fedBrackets, fedTI);
+  const nyAGI = Math.max(0, gross - sec125 - trad);
+  const nyTI = Math.max(0, nyAGI - T.nyStd);
+  const ny = nyTax(nyTI, nyAGI);
+  const nyc = bracketTax(T.nycBrackets, nyTI);
+  const taxes = fed + ny + nyc + ss + med;
+  const net = gross - sec125 - k401 - taxes;
+  return { gross, k401, trad, roth, sec125, ficaW, ss, med, fica: ss + med,
+           fedTI, fed, nyAGI, nyTI, ny, nyc, taxes, net,
+           eff: gross > 0 ? taxes / gross : 0 };
+}
+
+/* Withholding on a supplemental check (flat statutory rates + FICA),
+   given cumulative FICA wages and cumulative supplemental wages already paid. */
+function suppCheck(amount, cumFicaBefore, cumSuppBefore) {
+  if (amount <= 0) return { gross: 0, fed: 0, ny: 0, nyc: 0, ss: 0, med: 0, total: 0, net: 0, rate: 0 };
+  const at22 = Math.max(0, Math.min(amount, T.fedSuppHiThresh - Math.min(cumSuppBefore, T.fedSuppHiThresh)));
+  const fed = T.fedSupp * at22 + T.fedSuppHi * (amount - at22);
+  const ny = T.nySupp * amount;
+  const nyc = T.nycSupp * amount;
+  const ssRoom = Math.max(0, T.ssCap - Math.min(cumFicaBefore, T.ssCap));
+  const ss = T.ssRate * Math.min(amount, ssRoom);
+  const overBefore = Math.max(0, cumFicaBefore - T.addlMedThresh);
+  const overAfter = Math.max(0, cumFicaBefore + amount - T.addlMedThresh);
+  const med = T.medRate * amount + T.addlMedRate * (overAfter - overBefore);
+  const total = fed + ny + nyc + ss + med;
+  return { gross: amount, fed, ny, nyc, ss, med, total, net: amount - total, rate: total / amount };
+}
+
+/* Everything the UI needs. */
+function compute(inp) {
+  const full = annual(inp);
+  const baseOnly = annual({ ...inp, bonus: 0, signon: 0, reloc: 0 });
+  const other = annual({ ...inp, kType: inp.kType === "trad" ? "roth" : "trad" });
+
+  // Payment order: sign-on (+ relocation) in month 1, base through the year, bonus last.
+  const oneTime = inp.signon + inp.reloc;
+  const signonCk = suppCheck(oneTime, 0, 0);
+  const bonusCk = suppCheck(inp.bonus, Math.max(0, inp.base - inp.premiums - inp.hsa) + oneTime, oneTime);
+
+  // Withheld across the year: base at ~annualized W-4, supplemental at flat rates, FICA exact.
+  const wh = {
+    fed: baseOnly.fed + signonCk.fed + bonusCk.fed,
+    ny: baseOnly.ny + signonCk.ny + bonusCk.ny,
+    nyc: baseOnly.nyc + signonCk.nyc + bonusCk.nyc
+  };
+  wh.income = wh.fed + wh.ny + wh.nyc;
+  wh.total = wh.income + full.fica;
+  const refund = wh.income - (full.fed + full.ny + full.nyc);
+
+  // Marginal combined rate on the next $1 of bonus.
+  const marg = marginalRate(T.fedBrackets, Math.max(1, full.fedTI))
+    + marginalRate(T.nyBrackets, Math.max(1, full.nyTI))
+    + marginalRate(T.nycBrackets, Math.max(1, full.nyTI))
+    + T.medRate
+    + (full.ficaW < T.ssCap ? T.ssRate : 0)
+    + (full.ficaW > T.addlMedThresh ? T.addlMedRate : 0);
+
+  const match = Math.min(inp.matchPct, 1) * inp.base;
+  const monthlyBase = baseOnly.net / 12;
+
+  return { inp, full, baseOnly, other, signonCk, bonusCk, wh, refund, marg, match,
+           monthlyBase, rent: 0.30 * monthlyBase };
+}
+
+/* ================= formatting ================= */
+const fmt$ = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+const $ = x => fmt$.format(Math.round(x));
+const $signed = x => (x < 0 ? "−" : "") + fmt$.format(Math.abs(Math.round(x)));
+const pct = (x, d = 1) => (x * 100).toFixed(d) + "%";
+const $k = x => {
+  const v = Math.round(x);
+  if (Math.abs(v) >= 1e6) return "$" + (v / 1e6).toFixed(1).replace(/\.0$/, "") + "M";
+  if (Math.abs(v) >= 1000) return "$" + Math.round(v / 1000) + "k";
+  return "$" + v;
+};
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+
+/* ================= input state ================= */
+const el = id => document.getElementById(id);
+const state = {
+  base: 110000, bonusPct: 0.70, signon: 10000,
+  relocOn: false, reloc: 5000,
+  k401Pct: 0, kType: "trad", matchPct: 0,
+  hsaOn: false, hsa: 4400, premMo: 100
+};
+function inputs() {
+  return {
+    base: state.base,
+    bonus: state.base * state.bonusPct,
+    signon: state.signon,
+    reloc: state.relocOn ? state.reloc : 0,
+    k401Pct: state.k401Pct, kType: state.kType, matchPct: state.matchPct,
+    hsa: state.hsaOn ? Math.min(state.hsa, T.hsaLimit) : 0,
+    premiums: state.premMo * 12
+  };
+}
+
+/* ================= tooltip ================= */
+const tip = el("tip");
+let tipStore = {};
+function showTip(key, x, y) {
+  const html = tipStore[key];
+  if (!html) return;
+  tip.innerHTML = html;
+  tip.style.display = "block";
+  const r = tip.getBoundingClientRect();
+  let left = x + 14, top = y + 14;
+  if (left + r.width > innerWidth - 8) left = x - r.width - 12;
+  if (top + r.height > innerHeight - 8) top = y - r.height - 12;
+  tip.style.left = Math.max(6, left) + "px";
+  tip.style.top = Math.max(6, top) + "px";
+}
+function hideTip() { tip.style.display = "none"; }
+document.addEventListener("mousemove", e => {
+  const t = e.target.closest ? e.target.closest("[data-tipkey]") : null;
+  if (t) showTip(t.getAttribute("data-tipkey"), e.clientX, e.clientY); else hideTip();
+});
+document.addEventListener("focusin", e => {
+  const t = e.target.closest ? e.target.closest("[data-tipkey]") : null;
+  if (t) { const r = t.getBoundingClientRect(); showTip(t.getAttribute("data-tipkey"), r.left + r.width / 2, r.top); }
+});
+document.addEventListener("focusout", hideTip);
+document.addEventListener("scroll", hideTip, true);
+
+/* ================= chart helpers ================= */
+function niceCeil(v) {
+  if (v <= 0) return 1000;
+  const p = Math.pow(10, Math.floor(Math.log10(v)));
+  for (const m of [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]) if (m * p >= v) return m * p;
+  return 10 * p;
+}
+function ticks(max, n = 4) {
+  const arr = [];
+  for (let i = 0; i <= n; i++) arr.push((max / n) * i);
+  return arr;
+}
+/* column with 4px rounding on the data end only */
+function col(x, y, w, h, r, roundTop) {
+  if (h <= 0.5) return "";
+  r = Math.min(r, w / 2, h);
+  const x2 = x + w;
+  if (roundTop)
+    return `M${x},${y + h} L${x},${y + r} Q${x},${y} ${x + r},${y} L${x2 - r},${y} Q${x2},${y} ${x2},${y + r} L${x2},${y + h} Z`;
+  return `M${x},${y} L${x2},${y} L${x2},${y + h - r} Q${x2},${y + h} ${x2 - r},${y + h} L${x + r},${y + h} Q${x},${y + h} ${x},${y + h - r} Z`;
+}
+
+/* ================= renderers ================= */
+const SERIES = {
+  ded:  { label: "Pre-tax deductions", v: "--c-ded" },
+  fed:  { label: "Federal tax",        v: "--c-fed" },
+  ny:   { label: "NY State tax",       v: "--c-ny" },
+  nyc:  { label: "NYC local tax",      v: "--c-nyc" },
+  fica: { label: "FICA",               v: "--c-fica" },
+  base: { label: "Base take-home",     v: "--c-base" },
+  bonus:{ label: "Bonus take-home",    v: "--c-bonus" },
+  sign: { label: "Sign-on / reloc take-home", v: "--c-sign" }
+};
+const cvar = k => `var(${SERIES[k].v})`;
+
+function legendHTML(keys) {
+  return keys.map(k => `<span class="lg"><i style="background:${cvar(k)}"></i>${SERIES[k].label}</span>`).join("");
+}
+
+function tipRow(label, value, colorKey) {
+  const dot = colorKey ? `<i style="background:${cvar(colorKey)}"></i>` : "";
+  return `<div class="tr"><span>${dot}${esc(label)}</span><span class="num">${esc(value)}</span></div>`;
+}
+
+let R = null; // last computed results
+
+function renderTiles() {
+  const { full, inp } = R;
+  el("t-gross").textContent = $(full.gross);
+  const bits = [`${$k(inp.base)} base`, `${$k(inp.bonus)} bonus`];
+  if (inp.signon > 0) bits.push(`${$k(inp.signon)} sign-on`);
+  if (inp.reloc > 0) bits.push(`${$k(inp.reloc)} reloc`);
+  el("t-gross-sub").textContent = bits.join(" + ");
+
+  el("t-net").textContent = $(full.net);
+  let netSub = `${pct(full.net / Math.max(1, full.gross), 0)} of gross reaches your account`;
+  if (full.k401 > 0 || R.match > 0) {
+    const parts = [];
+    if (full.k401 > 0) parts.push(`${$k(full.k401)} yours`);
+    if (R.match > 0) parts.push(`${$k(R.match)} match`);
+    netSub = `plus ${parts.join(" + ")} into the 401(k)`;
+  }
+  el("t-net-sub").textContent = netSub;
+
+  el("t-eff").textContent = pct(full.eff);
+  el("t-monthly").textContent = $(R.monthlyBase);
+  el("t-rent").innerHTML = `30% rent guide: <b>${esc($(R.rent))}/mo</b>`;
+}
+
+function renderWaterfall() {
+  const wrap = el("wf-wrap");
+  const { full } = R;
+  const W = Math.max(320, wrap.clientWidth);
+  const H = 340, m = { t: 30, r: 8, b: 44, l: 54 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+
+  const steps = [
+    { key: "gross", label: "Gross", short: "Gross", amt: full.gross, total: true },
+    { key: "ded", label: "Pre-tax deductions", short: "Pre-tax", amt: full.sec125 + full.trad },
+    { key: "fed", label: "Federal tax", short: "Fed", amt: full.fed },
+    { key: "ny", label: "NY State tax", short: "NY", amt: full.ny },
+    { key: "nyc", label: "NYC local tax", short: "NYC", amt: full.nyc },
+    { key: "fica", label: "FICA", short: "FICA", amt: full.fica }
+  ];
+  if (full.roth > 0) steps.push({ key: "ded", label: "Roth 401(k) — after-tax", short: "Roth", amt: full.roth, roth: true });
+  steps.push({ key: "net", label: "Net take-home", short: "Net", amt: full.net, total: true });
+
+  const ymax = niceCeil(full.gross || 1);
+  const y = v => m.t + ih * (1 - v / ymax);
+  const n = steps.length, band = iw / n, bw = Math.min(24, band * 0.62);
+
+  let run = 0;
+  const geo = steps.map((s, i) => {
+    const cx = m.l + band * i + band / 2;
+    let y0, y1;
+    if (s.total) { y0 = s.key === "gross" ? full.gross : full.net; y1 = 0; }
+    else { y0 = run; y1 = run - s.amt; }
+    if (s.key === "gross") run = full.gross; else if (!s.total) run = y1;
+    return { ...s, i, cx, top: Math.max(y0, y1), bot: Math.min(y0, y1), run };
+  });
+
+  let g = "";
+  ticks(ymax).forEach(tv => {
+    g += `<line class="gline" x1="${m.l}" x2="${W - m.r}" y1="${y(tv)}" y2="${y(tv)}"></line>`;
+    g += `<text class="ax" x="${m.l - 8}" y="${y(tv) + 3.5}" text-anchor="end">${$k(tv)}</text>`;
+  });
+
+  let bars = "", labels = "", conns = "", hits = "";
+  tipStore = Object.fromEntries(Object.entries(tipStore).filter(([k]) => !k.startsWith("wf")));
+  geo.forEach((s, i) => {
+    const x = s.cx - bw / 2;
+    const yTop = y(s.top), h = Math.max(0, y(s.bot) - yTop);
+    const fill = s.total ? "var(--baseline)" : cvar(s.key);
+    const rounded = s.total ? col(x, yTop, bw, h, 4, true) : col(x, yTop, bw, h, 4, false);
+    bars += `<path d="${rounded}" fill="${fill}"></path>`;
+
+    if (s.total) {
+      labels += `<text class="dlab strong" x="${s.cx}" y="${yTop - 8}" text-anchor="middle">${$(s.amt)}</text>`;
+    } else {
+      labels += `<text class="dlab" x="${s.cx}" y="${yTop + h + 15}" text-anchor="middle">−${$(s.amt)}</text>`;
+    }
+    const shortLab = band < 74 ? s.short : s.label.length > 12 ? s.short : s.label;
+    labels += `<text class="ax" x="${s.cx}" y="${H - m.b + 18}" text-anchor="middle">${esc(shortLab)}</text>`;
+
+    if (i < geo.length - 1) {
+      const lvl = y(s.run);
+      conns += `<line class="bline" x1="${s.cx + bw / 2 + 2}" x2="${geo[i + 1].cx - bw / 2 - 2}" y1="${lvl}" y2="${lvl}"></line>`;
+    }
+
+    const key = "wf" + i;
+    const share = full.gross > 0 ? s.amt / full.gross : 0;
+    tipStore[key] = `<div class="th">${esc(s.label)}</div>`
+      + tipRow(s.total ? "Amount" : "Reduces pay by", $(s.amt), s.total ? null : s.key)
+      + tipRow("Share of gross", pct(share))
+      + (!s.total ? tipRow("Running total", $(s.run)) : "");
+    hits += `<rect class="hit" data-tipkey="${key}" tabindex="0" role="img" aria-label="${esc(s.label)}: ${esc($(s.amt))}, ${esc(pct(share))} of gross" x="${m.l + band * i}" y="${m.t}" width="${band}" height="${ih}"></rect>`;
+  });
+
+  wrap.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" aria-hidden="false">
+    ${g}
+    <line class="bline" x1="${m.l}" x2="${W - m.r}" y1="${y(0)}" y2="${y(0)}"></line>
+    ${conns}${bars}${labels}${hits}
+  </svg>`;
+
+  el("wf-legend").innerHTML = legendHTML(["ded", "fed", "ny", "nyc", "fica"]);
+
+  // relief table (also the accessibility fallback)
+  const { inp } = R;
+  const rows = [
+    ["Gross compensation", full.gross, null],
+    [`Traditional 401(k)${full.trad > 0 ? "" : " (off)"}`, -full.trad, "ded"],
+    ["HSA / FSA", -inp.hsa, "ded"],
+    ["Health premiums", -inp.premiums, "ded"],
+    ["Federal income tax", -full.fed, "fed"],
+    ["NY State income tax (incl. recapture)", -full.ny, "ny"],
+    ["NYC local income tax", -full.nyc, "nyc"],
+    ["Social Security (6.2% to $184,500)", -full.ss, "fica"],
+    ["Medicare (1.45% + 0.9% over $200k)", -full.med, "fica"]
+  ];
+  if (full.roth > 0) rows.push(["Roth 401(k) — after-tax", -full.roth, "ded"]);
+  rows.push(["Net take-home", full.net, null]);
+  el("wf-table").innerHTML = `<table class="grid">
+    <thead><tr><th>Line</th><th>Annual</th><th>% of gross</th></tr></thead>
+    <tbody>${rows.map(([l, v, k]) => `<tr>
+      <td>${k ? `<span class="swd" style="background:${cvar(k)}"></span>` : ""}${esc(l)}</td>
+      <td class="num">${v < 0 ? "−" + $(-v) : $(v)}</td>
+      <td class="num">${full.gross > 0 ? pct(Math.abs(v) / full.gross) : "—"}</td>
+    </tr>`).join("")}</tbody></table>`;
+}
+
+function renderMonthly() {
+  const wrap = el("mo-wrap");
+  const { inp, signonCk, bonusCk } = R;
+  const W = Math.max(320, wrap.clientWidth);
+  const H = 250, m = { t: 26, r: 92, b: 30, l: 50 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+
+  const months = [];
+  for (let i = 1; i <= 12; i++) {
+    const parts = [{ key: "base", amt: R.monthlyBase }];
+    if (i === 1 && signonCk.net > 0) parts.push({ key: "sign", amt: signonCk.net });
+    if (i === 12 && bonusCk.net > 0) parts.push({ key: "bonus", amt: bonusCk.net });
+    months.push({ i, parts, total: parts.reduce((a, p) => a + p.amt, 0) });
+  }
+  const ymax = niceCeil(Math.max(...months.map(mo => mo.total), R.rent * 1.15, 1));
+  const y = v => m.t + ih * (1 - v / ymax);
+  const band = iw / 12, bw = Math.min(24, band * 0.55);
+
+  let g = "";
+  ticks(ymax).forEach(tv => {
+    g += `<line class="gline" x1="${m.l}" x2="${W - m.r}" y1="${y(tv)}" y2="${y(tv)}"></line>`;
+    g += `<text class="ax" x="${m.l - 8}" y="${y(tv) + 3.5}" text-anchor="end">${$k(tv)}</text>`;
+  });
+
+  let bars = "", labels = "", hits = "";
+  tipStore = Object.fromEntries(Object.entries(tipStore).filter(([k]) => !k.startsWith("mo")));
+  months.forEach((mo, idx) => {
+    const x = m.l + band * idx + (band - bw) / 2;
+    let acc = 0;
+    mo.parts.forEach((p, pi) => {
+      const isTop = pi === mo.parts.length - 1;
+      const y1 = y(acc + p.amt), y0 = y(acc);
+      const gap = pi > 0 ? 2 : 0;
+      const h = Math.max(0, y0 - y1 - gap);
+      // only the stack's outer end is rounded; segments sitting on the baseline stay square
+      bars += isTop
+        ? `<path d="${col(x, y1, bw, h, 4, true)}" fill="${cvar(p.key)}"></path>`
+        : `<rect x="${x}" y="${y1}" width="${bw}" height="${h}" fill="${cvar(p.key)}"></rect>`;
+      acc += p.amt;
+    });
+    const noteworthy = mo.parts.length > 1;
+    if (noteworthy) {
+      labels += `<text class="dlab" x="${x + bw / 2}" y="${y(mo.total) - 7}" text-anchor="middle">${$k(mo.total)}</text>`;
+    }
+    labels += `<text class="ax" x="${x + bw / 2}" y="${H - m.b + 16}" text-anchor="middle">${mo.i}</text>`;
+
+    const key = "mo" + idx;
+    tipStore[key] = `<div class="th">Month ${mo.i}${mo.i === 1 && mo.parts.length > 1 ? " · first check + sign-on" : mo.i === 12 && mo.parts.length > 1 ? " · bonus month" : ""}</div>`
+      + mo.parts.map(p => tipRow(SERIES[p.key].label, $(p.amt), p.key)).join("")
+      + (mo.parts.length > 1 ? tipRow("Total", $(mo.total)) : "");
+    hits += `<rect class="hit" data-tipkey="${key}" tabindex="0" role="img" aria-label="Month ${mo.i}: ${esc($(mo.total))} net" x="${m.l + band * idx}" y="${m.t}" width="${band}" height="${ih}"></rect>`;
+  });
+
+  // rent affordability reference line: 30% of monthly base take-home
+  const ry = y(R.rent);
+  const rent = `<line x1="${m.l}" x2="${W - m.r + 6}" y1="${ry}" y2="${ry}" stroke="var(--mut)" stroke-width="1"></line>
+    <text class="ax" x="${W - m.r + 10}" y="${ry - 4}" text-anchor="start">30% rent</text>
+    <text class="ax" x="${W - m.r + 10}" y="${ry + 9}" text-anchor="start">${$(R.rent)}/mo</text>`;
+
+  wrap.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+    ${g}
+    <line class="bline" x1="${m.l}" x2="${W - m.r}" y1="${y(0)}" y2="${y(0)}"></line>
+    ${bars}${rent}${labels}${hits}
+    <text class="ax" x="${m.l}" y="${H - 4}" text-anchor="start">month of comp year</text>
+  </svg>`;
+
+  const keys = ["base"];
+  if (signonCk.net > 0) keys.push("sign");
+  if (bonusCk.net > 0) keys.push("bonus");
+  el("mo-legend").innerHTML = legendHTML(keys);
+
+  renderPaycheckCards();
+}
+
+function meterHTML(parts, total) {
+  if (total <= 0) return "";
+  return `<div class="meter">` + parts.filter(p => p.amt > 0.5).map(p =>
+    `<i style="flex:${(p.amt / total).toFixed(4)};background:${p.css || cvar(p.key)}"></i>`).join("") + `</div>`;
+}
+function prow(label, amt, key, css) {
+  return `<div class="prow"><span class="nm"><i style="background:${css || (key ? cvar(key) : "var(--baseline)")}"></i>${esc(label)}</span><span class="num">−${$(amt)}</span></div>`;
+}
+
+function renderPaycheckCards() {
+  const { inp, full, baseOnly, signonCk, bonusCk } = R;
+  const grossMo = inp.base / 12;
+  const dedMo = {
+    k401: full.k401 / 12, prem: inp.premiums / 12, hsa: inp.hsa / 12,
+    fed: baseOnly.fed / 12, ny: baseOnly.ny / 12, nyc: baseOnly.nyc / 12,
+    ss: baseOnly.ss / 12, med: baseOnly.med / 12
+  };
+  const netMo = R.monthlyBase;
+
+  let html = "";
+
+  // --- regular month ---
+  const regParts = [
+    { key: "base", amt: netMo },
+    { key: "ded", amt: dedMo.k401 + dedMo.prem + dedMo.hsa },
+    { key: "fed", amt: dedMo.fed }, { key: "ny", amt: dedMo.ny },
+    { key: "nyc", amt: dedMo.nyc }, { key: "fica", amt: dedMo.ss + dedMo.med }
+  ];
+  html += `<div class="pcard">
+    <div class="pk"><span>Regular month · base paycheck</span><b class="num">${$(grossMo)} gross</b></div>
+    ${meterHTML(regParts, grossMo)}
+    ${prow("Federal withholding", dedMo.fed, "fed")}
+    ${prow("NY State withholding", dedMo.ny, "ny")}
+    ${prow("NYC withholding", dedMo.nyc, "nyc")}
+    ${prow("Social Security + Medicare", dedMo.ss + dedMo.med, "fica")}
+    ${dedMo.k401 > 0 ? prow(inp.kType === "trad" ? "401(k) — Traditional" : "401(k) — Roth", dedMo.k401, "ded") : ""}
+    ${dedMo.prem > 0 ? prow("Health premium", dedMo.prem, "ded") : ""}
+    ${dedMo.hsa > 0 ? prow("HSA / FSA", dedMo.hsa, "ded") : ""}
+    <div class="pnet"><span class="nm">Net per month</span><span class="num">${$(netMo)}</span></div>
+    <div class="pfoot">This is the number to budget rent against. 30% guide: <b class="num">${$(R.rent)}</b>.</div>
+  </div>`;
+
+  // --- bonus check ---
+  if (bonusCk.gross > 0) {
+    const bParts = [
+      { key: "base", amt: bonusCk.net, css: cvar("bonus") },
+      { key: "fed", amt: bonusCk.fed }, { key: "ny", amt: bonusCk.ny },
+      { key: "nyc", amt: bonusCk.nyc }, { key: "fica", amt: bonusCk.ss + bonusCk.med }
+    ];
+    const over1m = inp.bonus + inp.signon + inp.reloc > T.fedSuppHiThresh;
+    html += `<div class="pcard">
+      <div class="pk"><span>Bonus check · month 12</span><b class="num">${$(bonusCk.gross)} gross</b></div>
+      ${meterHTML(bParts, bonusCk.gross)}
+      ${prow(`Federal flat ${over1m ? "22% / 37%" : "22%"}`, bonusCk.fed, "fed")}
+      ${prow("NY State flat 11.70%", bonusCk.ny, "ny")}
+      ${prow("NYC flat 4.25%", bonusCk.nyc, "nyc")}
+      ${prow("Social Security + Medicare", bonusCk.ss + bonusCk.med, "fica")}
+      <div class="pnet"><span class="nm">Bonus lands as</span><span class="num">${$(bonusCk.net)}</span></div>
+      <div class="pfoot"><b class="num">${pct(bonusCk.rate)}</b> withheld at payout — a withholding rate, not your actual tax. The difference comes back (or is owed) at filing; see below.</div>
+    </div>`;
+  }
+
+  // --- month 1 / sign-on ---
+  if (signonCk.gross > 0) {
+    const sParts = [
+      { key: "base", amt: signonCk.net, css: cvar("sign") },
+      { key: "fed", amt: signonCk.fed }, { key: "ny", amt: signonCk.ny },
+      { key: "nyc", amt: signonCk.nyc }, { key: "fica", amt: signonCk.ss + signonCk.med }
+    ];
+    html += `<div class="pcard">
+      <div class="pk"><span>Month 1 · sign-on${inp.reloc > 0 ? " + relocation" : ""}</span><b class="num">${$(signonCk.gross)} gross</b></div>
+      ${meterHTML(sParts, signonCk.gross)}
+      ${prow("Federal flat 22%", signonCk.fed, "fed")}
+      ${prow("NY State flat 11.70%", signonCk.ny, "ny")}
+      ${prow("NYC flat 4.25%", signonCk.nyc, "nyc")}
+      ${prow("Social Security + Medicare", signonCk.ss + signonCk.med, "fica")}
+      <div class="pnet"><span class="nm">One-time cash</span><span class="num">${$(signonCk.net)}</span></div>
+      <div class="pfoot">Paid with (or just after) your first paycheck — plan the broker fee and deposit around it, not the bonus.</div>
+    </div>`;
+  }
+
+  el("pcards").innerHTML = html;
+}
+
+function renderRecon() {
+  const { full, wh, refund, marg } = R;
+  const whRate = full.gross > 0 ? wh.total / full.gross : 0;
+  const refundCls = refund >= 0 ? "refund" : "owed";
+  el("recon-tiles").innerHTML = `
+    <div class="rtile">
+      <div class="tl">Withheld at payout (est.)</div>
+      <div class="tv num">${$(wh.total)}</div>
+      <div class="ts">${pct(whRate)} of gross, incl. FICA</div>
+    </div>
+    <div class="rtile">
+      <div class="tl">Actual full-year tax</div>
+      <div class="tv num">${$(full.taxes)}</div>
+      <div class="ts">${pct(full.eff)} effective after reconciliation</div>
+    </div>
+    <div class="rtile">
+      <div class="tl">${refund >= 0 ? "Estimated refund at filing" : "Estimated owed at filing"}</div>
+      <div class="tv num ${refundCls}">${$(Math.abs(refund))}</div>
+      <div class="ts">withholding minus actual income tax</div>
+    </div>`;
+
+  const rows = [
+    ["Federal", wh.fed, full.fed],
+    ["NY State", wh.ny, full.ny],
+    ["NYC", wh.nyc, full.nyc],
+    ["FICA (exact at payroll)", full.fica, full.fica]
+  ];
+  el("recon-table").innerHTML = `<table class="grid">
+    <thead><tr><th>Jurisdiction</th><th>Withheld</th><th>Actual</th><th>Over / (under)</th></tr></thead>
+    <tbody>${rows.map(([l, w, a]) => {
+      const d = w - a;
+      return `<tr><td>${esc(l)}</td><td class="num">${$(w)}</td><td class="num">${$(a)}</td>
+        <td class="num ${d > 0.5 ? "pos" : d < -0.5 ? "neg" : ""}">${Math.abs(d) < 0.5 ? "—" : $signed(d)}</td></tr>`;
+    }).join("")}</tbody></table>`;
+
+  el("recon-note").innerHTML =
+    `<b>Why the bonus check looks over-taxed:</b> supplemental pay is withheld flat — 22% federal `
+    + `(37% only on supplemental wages past $1,000,000), 11.70% NY State, 4.25% NYC — regardless of your bracket. `
+    + `Your actual marginal rate on the next bonus dollar right now is <b class="num">${pct(marg)}</b> `
+    + `(federal + state + city + Medicare${full.ficaW < T.ssCap ? " + Social Security" : ""}). `
+    + `Flat withholding above or below that is what creates the refund or balance due when you file.`;
+}
+
+function renderFineprint() {
+  const { inp, full } = R;
+  const items = [
+    "2026 rules, single filer, full-year NYC resident, standard deduction (federal $16,100; NY $8,000). No other income, credits, or itemizing.",
+    "Federal brackets per IRS Rev. Proc. 2025-32. NY State uses the 2026 rates from the enacted FY2026 budget (bottom five brackets each cut 0.1 point — top of the middle band is now 5.9%), including the tax-benefit recapture above $107,650 of NY AGI, which makes NY effectively a flat 5.9% of taxable income at analyst comp. Most calculators skip the recapture; it's worth a few hundred dollars here.",
+    "FICA 2026: Social Security 6.2% on the first $184,500 of wages; Medicare 1.45% plus 0.9% surtax on wages above $200,000. 401(k) contributions are still FICA-taxed; Section 125 items (health premiums, HSA/FSA via payroll) are not.",
+    "Bonus, sign-on, and relocation are modeled as supplemental wages: withheld at flat rates at payout, then taxed as ordinary income at filing. Order assumed: sign-on/relocation in month 1, bonus last.",
+    "Base-paycheck withholding is approximated by annualizing (standard W-4, no adjustments) — real paychecks will differ by small amounts.",
+    "401(k) is taken as a % of base pay only (capped at the $24,500 2026 employee limit); employer match goes to the plan, not take-home. Bonus timing varies by firm and start class — moving the bonus month doesn't change the annual math.",
+    "Estimates for planning, not tax advice."
+  ];
+  el("fineprint").innerHTML = items.map(i => `<li>${i}</li>`).join("");
+}
+
+function renderInputAccents() {
+  const { inp } = R;
+  el("chip-bonus").textContent = "= " + $(inp.bonus);
+
+  const kChip = el("chip-k401");
+  const want = state.base * state.k401Pct;
+  const capped = want > T.k401Limit + 0.5;
+  const delta = R.other.net - R.full.net; // net if type flipped minus net now
+  let kText = "";
+  if (R.full.k401 > 0) {
+    kText = `${$(R.full.k401)}/yr` + (capped ? ` — capped at the $24,500 limit` : "");
+    if (state.kType === "roth" && delta > 0.5) kText += ` · Roth costs ${$(delta)}/yr more take-home than Traditional`;
+    if (state.kType === "trad" && delta < -0.5) kText += ` · saves ${$(-delta)}/yr in tax vs Roth`;
+  }
+  kChip.textContent = kText;
+  kChip.hidden = !kText;
+  kChip.classList.toggle("warn", capped);
+
+  const mChip = el("chip-match");
+  mChip.textContent = R.match > 0 ? `+${$(R.match)}/yr employer money into the 401(k)` : "";
+  mChip.hidden = R.match <= 0;
+}
+
+function renderAll() {
+  R = compute(inputs());
+  renderTiles();
+  renderWaterfall();
+  renderMonthly();
+  renderRecon();
+  renderFineprint();
+  renderInputAccents();
+}
+
+/* ================= wiring ================= */
+function paintRange(r) {
+  const min = +r.min, max = +r.max, v = Math.min(max, Math.max(min, +r.value));
+  r.style.setProperty("--fill", ((v - min) / (max - min) * 100).toFixed(1) + "%");
+}
+function bindPair(numId, slId, key, scale) {
+  const num = el(numId), sl = el(slId);
+  const put = v => { state[key] = v * (scale || 1); renderAll(); };
+  num.addEventListener("input", () => {
+    const v = Math.max(0, +num.value || 0);
+    sl.value = v; paintRange(sl); put(v);
+  });
+  sl.addEventListener("input", () => {
+    num.value = sl.value; paintRange(sl); put(+sl.value);
+  });
+  paintRange(sl);
+}
+bindPair("in-base", "sl-base", "base");
+bindPair("in-bonuspct", "sl-bonuspct", "bonusPct", 0.01);
+bindPair("in-signon", "sl-signon", "signon");
+bindPair("in-k401", "sl-k401", "k401Pct", 0.01);
+bindPair("in-match", "sl-match", "matchPct", 0.01);
+bindPair("in-prem", "sl-prem", "premMo");
+
+el("in-reloc").addEventListener("input", () => { state.reloc = Math.max(0, +el("in-reloc").value || 0); renderAll(); });
+el("in-hsa").addEventListener("input", () => {
+  state.hsa = Math.max(0, +el("in-hsa").value || 0);
+  renderAll();
+});
+
+function bindSwitch(swId, bodyId, key) {
+  const sw = el(swId), body = el(bodyId);
+  sw.addEventListener("click", () => {
+    state[key] = !state[key];
+    sw.setAttribute("aria-checked", String(state[key]));
+    body.hidden = !state[key];
+    renderAll();
+  });
+}
+bindSwitch("sw-reloc", "reloc-body", "relocOn");
+bindSwitch("sw-hsa", "hsa-body", "hsaOn");
+
+el("seg-trad").addEventListener("click", () => setKType("trad"));
+el("seg-roth").addEventListener("click", () => setKType("roth"));
+function setKType(t) {
+  state.kType = t;
+  el("seg-trad").setAttribute("aria-checked", String(t === "trad"));
+  el("seg-roth").setAttribute("aria-checked", String(t === "roth"));
+  renderAll();
+}
+
+let raf = 0;
+const ro = new ResizeObserver(() => {
+  cancelAnimationFrame(raf);
+  raf = requestAnimationFrame(() => { if (R) { renderWaterfall(); renderMonthly(); } });
+});
+ro.observe(el("wf-wrap"));
+ro.observe(el("mo-wrap"));
+
+renderAll();
+</script>
