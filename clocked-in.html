@@ -230,6 +230,17 @@
 <script type="application/json" id="seed">null</script>
 
 <script>
+/* ── SHARED FLOOR CONFIG ─────────────────────────────────────────────
+   To turn on the shared floor for everyone with the link, paste your
+   Firebase Realtime Database URL between the quotes below, e.g.
+     window.CLOCKEDIN_DB = "https://your-project-default-rtdb.firebaseio.com";
+   Full 5-minute setup guide: CLOCKED-IN-SETUP.md in this repo.
+   (Alternatively, share a link with #db=<url>&f=<floor> — the app
+   remembers both and never needs this file edited.)                  */
+window.CLOCKEDIN_DB = null;
+</script>
+
+<script>
 (function(){
 'use strict';
 
@@ -238,8 +249,10 @@
 var ART=null, DL=null, MODE='solo', HTML_FALLBACK=false;
 var S=null, ME=null, TAB='floor';
 var SAVING=false, DIRTY=false, SAVE_TIMER=null;
+var DB=null, FLOOR=null, PENDING={}, FLUSHING=false, ES=null, POLL=null, SHREDDED=false, OFFLINE=false;
 
-var LS_STATE='clockedin.state', LS_ME='clockedin.me', SS_DRAFT='clockedin.draft';
+var LS_STATE='clockedin.state', LS_ME='clockedin.me', SS_DRAFT='clockedin.draft',
+    LS_DB='clockedin.db', LS_FLOOR='clockedin.floor';
 var EMOJIS=['🐂','🐻','🦈','🦅','🐍','🦊','🐺','🦍','🐉','🦉','🐎','🦬'];
 var CODES=['EBITDA','LBO4EVA','BPSBOI','DCFGOD','TENDIE','GLENGARRY','ACCRETIV','CAPEX'];
 var REACT_SET=['📈','📉','💀','🖨️','🔄'];
@@ -263,7 +276,18 @@ function rnd01(seedStr){ var a=hstr(seedStr); a=Math.imul(a^a>>>15, a|1); a^=a+M
 function defaultState(){
   return { v:1,
     ws:{ name:'The Floor', code:CODES[Math.floor(Math.random()*CODES.length)], seed:Math.floor(Math.random()*1e9) },
-    members:{}, sessions:{}, posts:{}, log:[] };
+    members:{}, sessions:{}, posts:{}, log:{} };
+}
+function normalize(){
+  S=S||{}; S.v=S.v||1;
+  S.ws=S.ws||{ name:'The Floor', code:FLOOR||'FLOOR', seed:FLOOR?hstr(FLOOR):0 };
+  S.members=S.members||{}; S.sessions=S.sessions||{}; S.posts=S.posts||{}; S.log=S.log||{};
+  if(Array.isArray(S.log)){ var o={}; S.log.forEach(function(e,i){ o['l0'+String(i).padStart(6,'0')]=e; }); S.log=o; }
+  Object.keys(S.members).forEach(function(id){ S.members[id].badges=S.members[id].badges||{}; });
+  Object.keys(S.sessions).forEach(function(id){
+    var v=S.sessions[id];
+    if(!Array.isArray(v)) S.sessions[id]=Object.keys(v).sort(function(a,b){return a-b;}).map(function(k){return v[k];});
+  });
 }
 function loadLocalState(){ try{ var s=localStorage.getItem(LS_STATE); return s?JSON.parse(s):null; }catch(e){ return null; } }
 function seedState(){ try{ var el=document.getElementById('seed'); var j=JSON.parse(el.textContent); return j&&j.v?j:null; }catch(e){ return null; } }
@@ -291,7 +315,8 @@ function pruneOld(hard){
       if(p.selfie||p.desk){ p.selfie=null; p.desk=null; shredded=true; }
     }); }
   });
-  if(S.log.length>60) S.log=S.log.slice(-60);
+  var lk=Object.keys(S.log).sort();
+  if(lk.length>60) lk.slice(0,lk.length-60).forEach(function(k){ delete S.log[k]; });
   return shredded;
 }
 
@@ -336,6 +361,158 @@ function enterReadonly(){
   toast('Read-only floor. Ask the owner for a desk — or go solo below.');
 }
 
+/* persist(paths): single entry point for every mutation.
+   paths maps RTDB-style subpaths ("members/m1/name") to values (null deletes).
+   remote → multi-path PATCH; artifact → whole-state publish; solo → mirror only. */
+function persist(paths){
+  if(MODE!=='remote') pruneOld(false);
+  try{ localStorage.setItem(LS_STATE, JSON.stringify(S)); }catch(e){}
+  if(MODE==='remote'){
+    for(var k in paths) PENDING[k]=(paths[k]===undefined)?null:paths[k];
+    flushRemote();
+  }
+  else if(MODE==='shared') requestSave();
+}
+function merged(){ var o={}; for(var i=0;i<arguments.length;i++){ var a=arguments[i]; for(var k in a) o[k]=a[k]; } return o; }
+function plog(msg){
+  var k='l'+nowMs().toString(36)+Math.random().toString(36).slice(2,5);
+  var e={t:nowMs(), msg:msg}; S.log[k]=e;
+  var o={}; o['log/'+k]=e; return o;
+}
+function logEntries(){ return Object.keys(S.log).sort().map(function(k){ return S.log[k]; }); }
+function toArr(v){ if(Array.isArray(v)) return v; if(v&&typeof v==='object') return Object.keys(v).sort(function(a,b){return a-b;}).map(function(k){return v[k];}); return []; }
+function awardP(id,key){
+  var m=S.members[id]; if(!m||m.badges[key]) return {};
+  m.badges[key]=dstr();
+  var b=BADGE_DEFS[key], o={}; o['members/'+id+'/badges/'+key]=m.badges[key];
+  if(ME&&id===ME.id) toast(b.e+' Badge earned: '+b.n);
+  return merged(o, plog(m.name+' earned “'+b.n+'”.'));
+}
+
+/* ── remote floor (Firebase Realtime Database over plain REST) ── */
+function rtdbUrl(p){ return DB+'/floors/'+encodeURIComponent(FLOOR)+(p?'/'+p:'')+'.json'; }
+function resolveRemote(){
+  var q,h;
+  try{ q=new URLSearchParams(location.search); h=new URLSearchParams(location.hash.replace(/^#\/?/,'')); }
+  catch(e){ q=h=new URLSearchParams(''); }
+  DB = window.CLOCKEDIN_DB || q.get('db') || h.get('db') || null;
+  try{ DB=DB||localStorage.getItem(LS_DB); }catch(e){}
+  if(DB){ DB=String(DB).trim().replace(/\/+$/,''); if(!/^https?:\/\/[\w.:-]+$/.test(DB)) DB=null; }
+  FLOOR = q.get('floor') || h.get('f') || null;
+  try{ FLOOR=FLOOR||localStorage.getItem(LS_FLOOR); }catch(e){}
+  if(FLOOR){ FLOOR=String(FLOOR).toUpperCase().replace(/[^A-Z0-9-]/g,'').slice(0,24)||null; }
+  if(DB){ try{ localStorage.setItem(LS_DB,DB); }catch(e){} }
+  if(FLOOR){ try{ localStorage.setItem(LS_FLOOR,FLOOR); }catch(e){} }
+}
+async function remoteLoad(){
+  var got=null, down=false;
+  try{
+    var r=await fetch(rtdbUrl(''),{cache:'no-store'});
+    if(r.ok) got=await r.json(); else down=true;
+  }catch(e){ down=true; }
+  if(down){
+    MODE='solo'; S=loadLocalState()||defaultState();
+    toast('Floor unreachable — solo desk for now. It will retry on reload.');
+    return;
+  }
+  if(got){ S=got; }
+  else{
+    S={ v:1, ws:{name:'The Floor', code:FLOOR, seed:hstr(FLOOR)}, members:{}, sessions:{}, posts:{}, log:{} };
+    try{ await fetch(rtdbUrl('ws'),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(S.ws)}); }catch(e){}
+  }
+}
+async function flushRemote(){
+  if(FLUSHING) return;
+  var keys=Object.keys(PENDING); if(!keys.length) return;
+  FLUSHING=true;
+  var batch={}; keys.forEach(function(k){ batch[k]=PENDING[k]; });
+  var ok=false;
+  try{
+    var r=await fetch(rtdbUrl(''),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(batch)});
+    ok=r.ok;
+  }catch(e){}
+  if(ok){
+    keys.forEach(function(k){ if(PENDING[k]===batch[k]) delete PENDING[k]; });
+    if(OFFLINE){ OFFLINE=false; toast('Back on the wire. Prints delivered.'); }
+    FLUSHING=false;
+    if(Object.keys(PENDING).length) flushRemote();
+  }else{
+    if(!OFFLINE){ OFFLINE=true; toast('Floor unreachable — keeping your prints on this device, will retry.'); }
+    FLUSHING=false;
+    setTimeout(flushRemote, 6000);
+  }
+}
+function applyAt(path, data){
+  var parts=String(path).split('/').filter(Boolean);
+  if(!parts.length){ S=data||null; normalize(); return; }
+  var node=S;
+  for(var i=0;i<parts.length-1;i++){
+    var k=parts[i];
+    if(typeof node[k]!=='object'||node[k]==null) node[k]={};
+    node=node[k];
+  }
+  var last=parts[parts.length-1];
+  if(data==null) delete node[last]; else node[last]=data;
+}
+function afterRemote(){
+  normalize();
+  if(!document.querySelector('.scrim, .cam-stage, .takeover')) render();
+}
+function startStream(){
+  if(!window.EventSource){ startPoll(); return; }
+  try{ ES=new EventSource(rtdbUrl('')); }catch(e){ startPoll(); return; }
+  ES.addEventListener('put',function(ev){
+    try{ var m=JSON.parse(ev.data); applyAt(m.path, m.data); applyPendingLocally(); afterRemote(); }catch(e){}
+  });
+  ES.addEventListener('patch',function(ev){
+    try{ var m=JSON.parse(ev.data); var base=String(m.path).replace(/\/+$/,'');
+      for(var k in m.data) applyAt(base+'/'+k, m.data[k]);
+      applyPendingLocally(); afterRemote(); }catch(e){}
+  });
+  ES.onerror=function(){
+    if(ES && ES.readyState===2){ try{ES.close();}catch(e){} ES=null; startPoll(); }
+  };
+}
+function startPoll(){
+  if(POLL) return;
+  POLL=setInterval(async function(){
+    try{
+      var r=await fetch(rtdbUrl(''),{cache:'no-store'});
+      if(r.ok){ var j=await r.json(); if(j){ S=j; applyPendingLocally(); afterRemote(); } }
+    }catch(e){}
+  },15000);
+}
+function applyPendingLocally(){ for(var k in PENDING) applyAt(k, PENDING[k]); }
+function shredRemote(){
+  if(SHREDDED) return; SHREDDED=true;
+  var cut=new Date(); cut.setDate(cut.getDate()-7);
+  var cutS=dstr(cut), o={}, n=0;
+  Object.keys(S.posts).forEach(function(ds){
+    if(ds<cutS) Object.keys(S.posts[ds]).forEach(function(id){
+      var p=S.posts[ds][id];
+      if(p&&(p.selfie||p.desk)){
+        p.selfie=null; p.desk=null;
+        o['posts/'+ds+'/'+id+'/selfie']=null; o['posts/'+ds+'/'+id+'/desk']=null; n++;
+      }
+    });
+  });
+  var lk=Object.keys(S.log).sort();
+  if(lk.length>60) lk.slice(0,lk.length-60).forEach(function(k){ delete S.log[k]; o['log/'+k]=null; });
+  if(Object.keys(o).length) persist(o);
+  if(n) toast('🗑️ Compliance shredded '+n+' photo'+(n>1?'s':'')+' older than 7 days.');
+}
+function floorLink(){
+  var base=location.href.split('#')[0].split('?')[0];
+  var carryDb = !window.CLOCKEDIN_DB && DB ? '&db='+encodeURIComponent(DB) : '';
+  return base+'#f='+FLOOR+carryDb;
+}
+function copyLink(){
+  var l=floorLink();
+  var done=function(){ toast('Floor link copied. Distribute to the syndicate.'); };
+  if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(l).then(done,function(){ prompt('Copy the floor link:', l); });
+  else prompt('Copy the floor link:', l);
+}
+
 /* ───────────────────────── time & finance math ───────────────────────── */
 
 function weekStart(d){ var x=new Date(d||nowMs()); var day=(x.getDay()+6)%7; x.setHours(0,0,0,0); x.setDate(x.getDate()-day); return x.getTime(); }
@@ -374,7 +551,6 @@ function postStreak(id){
   while(S.posts[dstr(d)]&&S.posts[dstr(d)][id]){ n++; d.setDate(d.getDate()-1); }
   return n;
 }
-function log(msg){ S.log.push({t:nowMs(), msg:msg}); }
 
 /* ───────────────────────── ui plumbing ───────────────────────── */
 
@@ -392,7 +568,11 @@ function sheet(html){
 }
 function setModeChip(){
   var el=document.getElementById('modeChip');
-  el.textContent = MODE==='shared' ? 'live floor' : MODE==='readonly' ? 'read-only' : 'solo desk';
+  el.textContent = MODE==='remote' ? (OFFLINE?'reconnecting…':'live floor')
+    : MODE==='shared' ? 'workspace floor'
+    : MODE==='readonly' ? 'read-only'
+    : MODE==='lobby' ? 'lobby'
+    : 'solo desk';
 }
 function setTape(){
   var bits=[];
@@ -408,6 +588,7 @@ function setTape(){
 /* ───────────────────────── renders ───────────────────────── */
 
 function render(){
+  if(MODE==='lobby'){ renderLobby(); return; }
   setModeChip(); setTape();
   document.getElementById('floorCode').textContent=S.ws.code||'';
   renderTabs();
@@ -427,6 +608,49 @@ $tabs.addEventListener('click',function(e){
   var b=e.target.closest('[data-tab]'); if(!b) return;
   TAB=b.dataset.tab; render();
 });
+
+/* lobby: DB configured but no floor chosen yet */
+function renderLobby(){
+  setModeChip(); renderTabs();
+  document.getElementById('floorCode').textContent='';
+  document.getElementById('tape').innerHTML=QUIPS.join(' &nbsp;·&nbsp; ')+' &nbsp;·&nbsp; '+QUIPS.join(' &nbsp;·&nbsp; ');
+  $view.innerHTML=
+    '<div class="card card-pad center" style="margin-top:24px">'+
+      '<div class="mc-title">One floor. One link.</div>'+
+      '<p class="muted small" style="max-width:40ch;margin:8px auto 16px">Start a floor and send the link to the group chat, or paste the link somebody sent you. Everyone with the link shares the same tape.</p>'+
+      '<div class="row-btns" style="justify-content:center">'+
+        '<button class="btn-pri" id="lbStart">Start a floor</button>'+
+        '<button class="btn-ghost" id="lbJoin">I have a link</button>'+
+      '</div>'+
+    '</div>';
+  $view.querySelector('#lbStart').addEventListener('click', async function(){
+    FLOOR=CODES[Math.floor(Math.random()*CODES.length)]+'-'+Math.random().toString(36).slice(2,6).toUpperCase();
+    try{ localStorage.setItem(LS_FLOOR,FLOOR); }catch(e){}
+    try{ history.replaceState(null,'','#f='+FLOOR); }catch(e){}
+    MODE='remote'; await remoteLoad();
+    if(MODE==='remote'){ normalize(); startStream(); toast('Floor '+FLOOR+' is open for business. Invite link is in Desk.'); }
+    ME=null; render();
+  });
+  $view.querySelector('#lbJoin').addEventListener('click', function(){
+    var sc=sheet('<h2>Join a floor</h2>'+
+      '<div class="field"><label for="lj">Paste the floor link or code</label><input id="lj" placeholder="https://…#f=EBITDA-7K3Q or EBITDA-7K3Q"></div>'+
+      '<div class="row-btns"><button class="btn-pri" id="ljGo">Walk on</button></div>');
+    sc.querySelector('#ljGo').addEventListener('click', async function(){
+      var v=sc.querySelector('#lj').value.trim();
+      var m=v.match(/[#&?]f=([A-Za-z0-9-]+)/) || v.match(/^([A-Za-z0-9-]{3,24})$/);
+      if(!m){ toast('That is not a floor link. It might be a term sheet.'); return; }
+      var dm=v.match(/[#&?]db=([^&\s]+)/);
+      if(dm){ try{ var cand=decodeURIComponent(dm[1]).replace(/\/+$/,''); if(/^https?:\/\/[\w.:-]+$/.test(cand)){ DB=cand; localStorage.setItem(LS_DB,DB); } }catch(e){} }
+      FLOOR=m[1].toUpperCase();
+      try{ localStorage.setItem(LS_FLOOR,FLOOR); }catch(e){}
+      try{ history.replaceState(null,'','#f='+FLOOR); }catch(e){}
+      sc.remove();
+      MODE='remote'; await remoteLoad();
+      if(MODE==='remote'){ normalize(); startStream(); }
+      ME=null; render();
+    });
+  });
+}
 
 /* join screen */
 function renderJoin(){
@@ -466,9 +690,11 @@ function renderJoin(){
     var id='m'+Math.random().toString(36).slice(2,9);
     S.members[id]={name:name, emoji:pick, joined:nowMs(), badges:{}};
     S.sessions[id]=[];
-    log(name+' joined the floor. HR has been notified.');
+    var P={}; P['members/'+id]={name:name, emoji:pick, joined:S.members[id].joined};
     ME={id:id}; localStorage.setItem(LS_ME, JSON.stringify(ME));
-    checkTerminal(); requestSave(); render();
+    checkTerminal();
+    persist(merged(P, plog(name+' joined the floor. HR has been notified.')));
+    render();
   });
 }
 
@@ -500,9 +726,9 @@ function renderFloor(){
       '</div>';
     }).join('')+'</div>'+
     '<div class="sec-label">Tape — floor activity</div>'+
-    '<div class="card">'+ (S.log.length? S.log.slice(-12).reverse().map(function(l){
+    '<div class="card">'+ (function(){ var L=logEntries(); return L.length? L.slice(-12).reverse().map(function(l){
         return '<div class="log-line"><span class="log-t">'+fmtT(l.t)+'</span><span>'+esc(l.msg)+'</span></div>';
-      }).join('') : '<div class="log-line"><span>No prints yet. The tape is embarrassingly clean.</span></div>')+
+      }).join('') : '<div class="log-line"><span>No prints yet. The tape is embarrassingly clean.</span></div>'; })()+
     '</div>'+
     (MODE==='readonly'? roBanner():'');
   var cb=$view.querySelector('#clockBtn');
@@ -534,18 +760,22 @@ function wireRoBanner(){
 function clockIn(){
   if(!guardWrite()) return;
   var t=nowMs(), d=new Date(t);
-  (S.sessions[ME.id]=S.sessions[ME.id]||[]).push({i:t,o:null});
+  var arr=(S.sessions[ME.id]=S.sessions[ME.id]||[]);
+  arr.push({i:t,o:null});
   var m=S.members[ME.id];
-  log(m.name+' clocked in.'+(d.getHours()>=22||d.getHours()<5?' After-hours trading detected.':''));
-  if(d.getHours()===9&&d.getMinutes()===41) award(ME.id,'keynote');
+  var P={}; P['sessions/'+ME.id+'/'+(arr.length-1)]={i:t};
+  P=merged(P, plog(m.name+' clocked in.'+(d.getHours()>=22||d.getHours()<5?' After-hours trading detected.':'')));
+  if(d.getHours()===9&&d.getMinutes()===41) P=merged(P, awardP(ME.id,'keynote'));
   Object.keys(S.members).forEach(function(id){
     if(id===ME.id) return;
     var a=activeSession(id);
-    if(a && Math.floor(a.i/60000)===Math.floor(t/60000)){ award(ME.id,'synergy'); award(id,'synergy'); log('Synergy achieved. Nobody is sure what it means.'); }
+    if(a && Math.floor(a.i/60000)===Math.floor(t/60000)){
+      P=merged(P, awardP(ME.id,'synergy'), awardP(id,'synergy'), plog('Synergy achieved. Nobody is sure what it means.'));
+    }
   });
   bell();
   toast(CLOCKIN_LINES[Math.floor(Math.random()*CLOCKIN_LINES.length)]);
-  requestSave(); render();
+  persist(P); render();
 }
 function confirmClockOut(){
   var sc=sheet('<h2>Close position?</h2><p class="muted">Are you sure? Nobody actually leaves.</p>'+
@@ -557,25 +787,20 @@ function confirmClockOut(){
 function clockOut(){
   if(!guardWrite()) return;
   var a=activeSession(ME.id); if(!a) return;
+  var idx=(S.sessions[ME.id]||[]).indexOf(a);
   a.o=nowMs();
   var dur=a.o-a.i, m=S.members[ME.id], d=new Date();
   var pnl=hrs(dur);
-  if(dur<5*60000){ award(ME.id,'quiet'); log(m.name+' clocked out after '+Math.max(1,Math.round(dur/60000))+' minutes. Bold.'); }
-  else log(m.name+' clocked out. P&L: '+fmtH(pnl)+' of their life.');
-  if(d.getDay()>=1&&d.getDay()<=5&&d.getHours()<18&&dur>3*3600000) award(ME.id,'grass');
+  var P={}; P['sessions/'+ME.id+'/'+idx+'/o']=a.o;
+  if(dur<5*60000){ P=merged(P, awardP(ME.id,'quiet'), plog(m.name+' clocked out after '+Math.max(1,Math.round(dur/60000))+' minutes. Bold.')); }
+  else P=merged(P, plog(m.name+' clocked out. P&L: '+fmtH(pnl)+' of their life.'));
+  if(d.getDay()>=1&&d.getDay()<=5&&d.getHours()<18&&dur>3*3600000) P=merged(P, awardP(ME.id,'grass'));
   toast(CLOCKOUT_LINES[Math.floor(Math.random()*CLOCKOUT_LINES.length)]+' P&L: '+fmtH(pnl)+' of your life.');
-  requestSave(); render();
+  persist(P); render();
 }
 function guardWrite(){
   if(MODE==='readonly'){ toast('Read-only floor — your keystrokes mean nothing here.'); return false; }
   return true;
-}
-function award(id,key){
-  var m=S.members[id]; if(!m||m.badges[key]) return;
-  m.badges[key]=dstr();
-  var b=BADGE_DEFS[key];
-  if(id===ME.id) toast(b.e+' Badge earned: '+b.n);
-  log(S.members[id].name+' earned “'+b.n+'”.');
 }
 
 /* feed */
@@ -629,7 +854,7 @@ function postCard(ds,id,p){
     '<span class="chip '+(p.late?'late':'ok')+'">'+(p.late?'Late filing':'Filed')+' '+fmtT(p.t)+'</span></div>'+
     photos+
     '<div class="reacts">'+REACT_SET.map(function(e){
-      var who=(p.reactions&&p.reactions[e])||[];
+      var who=toArr(p.reactions&&p.reactions[e]);
       var mine=ME&&who.indexOf(ME.id)>=0;
       return '<button class="react'+(mine?' mine':'')+'" data-re="'+e+'" aria-label="React '+e+'">'+e+(who.length?' <span class="c">'+who.length+'</span>':'')+'</button>';
     }).join('')+'</div></div>';
@@ -638,17 +863,18 @@ function todayHOn(ds,id){
   var d=new Date(ds+'T00:00:00'); var a=d.getTime(); var b=a+86400000;
   return hrs(msIn(id,a,b));
 }
-var reactTimer=null;
+var reactTimer=null, reactPending={};
 function wireReacts(){
   $view.querySelectorAll('[data-post]').forEach(function(card){
     card.querySelector('.reacts').addEventListener('click',function(e){
       var b=e.target.closest('[data-re]'); if(!b||!ME) return;
       if(!guardWrite()) return;
       var bits=card.dataset.post.split('|'), p=S.posts[bits[0]][bits[1]], em=b.dataset.re;
-      p.reactions=p.reactions||{}; p.reactions[em]=p.reactions[em]||[];
+      p.reactions=p.reactions||{}; p.reactions[em]=toArr(p.reactions[em]);
       var ix=p.reactions[em].indexOf(ME.id);
       if(ix>=0) p.reactions[em].splice(ix,1); else p.reactions[em].push(ME.id);
-      clearTimeout(reactTimer); reactTimer=setTimeout(requestSave,1200);
+      reactPending['posts/'+bits[0]+'/'+bits[1]+'/reactions/'+em]=p.reactions[em].length?p.reactions[em]:null;
+      clearTimeout(reactTimer); reactTimer=setTimeout(function(){ var o=reactPending; reactPending={}; persist(o); },1200);
       renderFeed();
     });
   });
@@ -685,9 +911,10 @@ function renderLeague(){
   }
 }
 function buffettMode(){
-  var until=nowMs()+60000;
-  Object.keys(S.members).forEach(function(id){ S.members[id].buffettUntil=until; });
+  var until=nowMs()+60000, P={};
+  Object.keys(S.members).forEach(function(id){ S.members[id].buffettUntil=until; P['members/'+id+'/buffettUntil']=until; });
   toast('👴 “Would you like a Cherry Coke?” — everyone is Warren for 60 seconds.');
+  if(MODE==='remote') persist(P);
   render();
   setTimeout(function(){ if(document.body) render(); },61000);
 }
@@ -728,17 +955,28 @@ function renderDesk(){
       '<div class="field"><label for="fn">Floor name</label><input id="fn" maxlength="28" value="'+esc(S.ws.name)+'"></div>'+
       '<div class="row-btns">'+
         '<button class="btn-ghost" id="saveP">Save changes</button>'+
+        (MODE==='remote'?'<button class="btn-ghost" id="invite">🔗 Invite the floor</button>':'')+
         '<button class="btn-ghost" id="notif">🔔 Margin Call alerts</button>'+
         (DL?'<button class="btn-ghost" id="csv">Export timesheet</button>':'')+
       '</div>'+
-      '<p class="small muted" style="margin:12px 0 0">Floor code <span class="mono">'+esc(S.ws.code)+'</span> · Share this page with the group; whoever can edit it shares one floor. Photos self-shred after 7 days. This is not investment advice.</p>'+
+      '<p class="small muted" style="margin:12px 0 0">Floor code <span class="mono">'+esc(S.ws.code)+'</span> · '+
+      (MODE==='remote'
+        ? 'Anyone with the invite link is on this floor — treat it like a group-chat link.'
+        : MODE==='shared'
+          ? 'Share this artifact with the group; whoever can edit it shares one floor.'
+          : 'Solo desk: hours live on this device only.')+
+      ' Photos self-shred after 7 days. This is not investment advice.</p>'+
     '</div>';
   $view.querySelector('#saveP').addEventListener('click',function(){
     if(!guardWrite()) return;
     var n=$view.querySelector('#pn').value.trim(), f=$view.querySelector('#fn').value.trim();
-    if(n) m.name=n; if(f) S.ws.name=f;
-    checkTerminal(); requestSave(); render(); toast('Filed with HR.');
+    var P={};
+    if(n){ m.name=n; P['members/'+ME.id+'/name']=n; }
+    if(f){ S.ws.name=f; P['ws/name']=f; }
+    checkTerminal(); persist(P); render(); toast('Filed with HR.');
   });
+  var inv=$view.querySelector('#invite');
+  if(inv) inv.addEventListener('click', copyLink);
   $view.querySelector('#notif').addEventListener('click',function(){
     try{
       if(!('Notification' in window)){ toast('This browser does not do alerts. Like a good junior, check manually.'); return; }
@@ -883,8 +1121,8 @@ function filePost(selfie,desk){
   try{ sessionStorage.setItem(SS_DRAFT, JSON.stringify({ds:today,selfie:selfie,desk:desk,late:late,t:t})); }catch(e){}
   S.posts[today]=S.posts[today]||{};
   S.posts[today][ME.id]={t:t, late:late, selfie:selfie, desk:desk, reactions:{}};
-  log(S.members[ME.id].name+(late?' filed LATE. The stamp is red.':' answered the Margin Call on time.'));
-  requestSave();
+  var P={}; P['posts/'+today+'/'+ME.id]={t:t, late:late, selfie:selfie, desk:desk};
+  persist(merged(P, plog(S.members[ME.id].name+(late?' filed LATE. The stamp is red.':' answered the Margin Call on time.'))));
   try{ sessionStorage.removeItem(SS_DRAFT); }catch(e){}
   TAB='feed'; render();
   toast(late?'LATE FILING accepted. The committee has noted the pattern.':'Filed on time. Who are you and what have you done with you?');
@@ -917,7 +1155,7 @@ document.addEventListener('input',function(e){
   var v=(e.target&&e.target.value||'').toLowerCase();
   if(v.indexOf('hodl')>=0){
     e.target.value=e.target.value.replace(/hodl/ig,'');
-    if(ME) award(ME.id,'hodl');
+    if(ME&&S&&S.members[ME.id]) persist(awardP(ME.id,'hodl'));
     candles();
   }
 });
@@ -1010,13 +1248,17 @@ setInterval(function(){ if(ME&&!document.querySelector('.scrim, .cam-stage, .tak
       DL=await window.claude.use('downloads').catch(function(){return null;});
     }
   }catch(e){}
-  MODE = ART ? 'shared' : 'solo';
-  S=await loadState();
-  ME=loadMe();
+  if(!ART) resolveRemote();  /* artifact CSP blocks external hosts, so remote only outside it */
+  if(DB&&FLOOR){ MODE='remote'; await remoteLoad(); }
+  else if(DB){ MODE='lobby'; }
+  else if(ART){ MODE='shared'; S=await loadState(); }
+  else{ MODE='solo'; S=loadLocalState()||defaultState(); }
+  if(MODE!=='lobby'){ normalize(); ME=loadMe(); }
   checkTerminal();
   render();
+  if(MODE==='remote'){ startStream(); shredRemote(); }
   restoreDraft();
-  console.info('[clocked-in] mode:',MODE);
+  console.info('[clocked-in] mode:',MODE,FLOOR||'');
 })();
 })();
 </script>
