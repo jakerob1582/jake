@@ -1,10 +1,10 @@
-# App Build Prompt: "LockedIn" — BeReal for Finance Hours
+# App Build Prompt: "Clocked In" — BeReal for Finance Hours
 
-Copy everything below this line into your app builder of choice.
+Copy everything below this line into your app builder of choice. (This prompt has since been implemented — see `clocked-in.html`.)
 
 ---
 
-Build a mobile-first app called **LockedIn** (working titles also acceptable: *GrindReal*, *The Daily Margin Call*, *ClockedTF-In*). It's BeReal meets a time clock, built for a small group of finance friends who want to compete over who works the most unhinged hours — and prove it with photos.
+Build a mobile-first app called **Clocked In** (working titles also acceptable: *GrindReal*, *The Daily Margin Call*, *ClockedTF-In*). It's BeReal meets a time clock, built for a small group of finance friends who want to compete over who works the most unhinged hours — and prove it with photos.
 
 ## Core concept
 
